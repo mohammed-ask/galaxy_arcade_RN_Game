@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Dimensions, StyleSheet, StatusBar, Text, View, Alert, ImageBackground } from 'react-native';
 import Matter from 'matter-js';
 import { GameEngine } from 'react-native-game-engine';
-import Svg, { Polygon, Circle, Rect } from 'react-native-svg';
 import Asteroid from '../assets/Ufo.js';
 import Bullet from '../assets/Bullets.js';
 import Spaceship from '../assets/Spaceship.js';
@@ -58,7 +57,7 @@ export default function GameScreen({ navigation }) {
 
   // Check for level up
   useEffect(() => {
-    if (scoreRef.current >= 200 && !levelUp) {
+    if (scoreRef.current >= 20 && !levelUp) {
       setLevelUp(true); // Activate level up
     }
   }, [displayScore, levelUp]);
@@ -95,6 +94,16 @@ export default function GameScreen({ navigation }) {
     return entities;
   };
 
+  // Create a bullet
+  const createBullet = (x, y) => {
+    return Matter.Bodies.rectangle(x, y, 10, 20, {
+      label: 'bullet',
+      isSensor: true,
+      frictionAir: 0,
+      inertia: Infinity,
+    });
+  };
+
   // Bullet Shooting (continuous)
   let bulletCooldown = 0;
   const BulletShooter = (entities, { time }) => {
@@ -104,36 +113,21 @@ export default function GameScreen({ navigation }) {
 
       // Fire two bullets together if level up is active
       if (levelUp) {
-        const bullet1 = Matter.Bodies.rectangle(shipRef.current.position.x - 5, shipRef.current.position.y - 30, 10, 20, {
-          label: 'bullet',
-          isSensor: true,
-          frictionAir: 0,
-          inertia: Infinity,
-        });
-        const bullet2 = Matter.Bodies.rectangle(shipRef.current.position.x + 5, shipRef.current.position.y - 30, 10, 20, {
-          label: 'bullet',
-          isSensor: true,
-          frictionAir: 0,
-          inertia: Infinity,
-        });
+        const bullet1 = createBullet(shipRef.current.position.x - 5, shipRef.current.position.y - 30);
+        const bullet2 = createBullet(shipRef.current.position.x + 5, shipRef.current.position.y - 30);
         Matter.Body.setVelocity(bullet1, { x: 0, y: -5 });
         Matter.Body.setVelocity(bullet2, { x: 0, y: -5 });
-        Matter.Body.set(bullet1, { force: { x: 0, y: -0.03 } }); // Counteract gravity
-        Matter.Body.set(bullet2, { force: { x: 0, y: -0.03 } }); // Counteract gravity
+        Matter.Body.set(bullet1, { force: { x: 0, y: -0.03 } });
+        Matter.Body.set(bullet2, { force: { x: 0, y: -0.03 } });
         Matter.World.add(worldRef.current, bullet1);
         Matter.World.add(worldRef.current, bullet2);
         entities[`bullet_${Date.now()}_1`] = { body: bullet1, color: 'yellow', renderer: Bullet };
         entities[`bullet_${Date.now()}_2`] = { body: bullet2, color: 'yellow', renderer: Bullet };
       } else {
         // Fire single bullet
-        const bullet = Matter.Bodies.rectangle(shipRef.current.position.x, shipRef.current.position.y - 30, 10, 20, {
-          label: 'bullet',
-          isSensor: true,
-          frictionAir: 0,
-          inertia: Infinity,
-        });
-        Matter.Body.setVelocity(bullet, { x: 0, y: -5 }); // Reduced bullet speed
-        Matter.Body.set(bullet, { force: { x: 0, y: -0.03 } }); // Counteract gravity
+        const bullet = createBullet(shipRef.current.position.x, shipRef.current.position.y - 30);
+        Matter.Body.setVelocity(bullet, { x: 0, y: -5 });
+        Matter.Body.set(bullet, { force: { x: 0, y: -0.03 } });
         Matter.World.add(worldRef.current, bullet);
         entities[`bullet_${Date.now()}`] = { body: bullet, color: 'yellow', renderer: Bullet };
       }
@@ -141,32 +135,75 @@ export default function GameScreen({ navigation }) {
     return entities;
   };
 
-  const genreateEvenOdd = () => {
-    const num = Math.floor(Math.random() * 10) + 1
-    return num % 2 === 0
-  }
+  // Generate even or odd
+  const generateEvenOdd = () => {
+    const num = Math.floor(Math.random() * 10) + 1;
+    return num % 2 === 0;
+  };
+
+  // Create an asteroid or meteor
+  const createAsteroid = (x, y, isMeteor) => {
+    return Matter.Bodies.circle(x, y, 20, {
+      label: isMeteor ? 'meteor' : 'asteroid',
+      restitution: 0.5,
+      frictionAir: isMeteor ? 0.05 : 0.1,
+      health: isMeteor ? 4 : 1,
+    });
+  };
 
   // Asteroid Spawner
   const AsteroidSpawner = (entities) => {
-    const enemy = levelUp && genreateEvenOdd()
+    const isMeteor = levelUp && generateEvenOdd();
     if (Math.random() < 0.015) {
       const x = Math.random() * width;
       const color = colors[Math.floor(Math.random() * colors.length)];
-      const asteroid = Matter.Bodies.circle(x, 0, 20, {
-        label: enemy ? 'meteor' : 'asteroid',
-        restitution: 0.5,
-        frictionAir: levelUp ? 0.05 : 0.1,
-        health: enemy ? 4 : 1, // Set health to 4 if level up is active
-      });
-      Matter.Body.setVelocity(asteroid, { x: 0, y: 5 }); // Reduced asteroid speed
+      const asteroid = createAsteroid(x, 0, isMeteor);
+      Matter.Body.setVelocity(asteroid, { x: 0, y: 5 });
       Matter.World.add(worldRef.current, asteroid);
-      if (!enemy) {
-        entities[`asteroid_${Date.now()}`] = { body: asteroid, color, renderer: Asteroid, health: asteroid.health };
-      } else {
-        entities[`meteor_${Date.now()}`] = { body: asteroid, color, renderer: Asteroid, health: asteroid.health };
-      }
+      const key = isMeteor ? `meteor_${Date.now()}` : `asteroid_${Date.now()}`;
+      entities[key] = { body: asteroid, color, renderer: Asteroid, health: asteroid.health };
     }
     return entities;
+  };
+
+  // Handle collision between bullet and asteroid/meteor
+  const handleBulletCollision = (entities, bullet, target, targetKey) => {
+    // Remove bullet from Matter.js world and entities
+    Matter.World.remove(worldRef.current, bullet);
+    Object.keys(entities).forEach(key => {
+      if (entities[key].body === bullet) {
+        delete entities[key];
+      }
+    });
+
+    // Decrease target health
+    entities[targetKey].health -= 1;
+
+    // If target health reaches 0, remove it
+    if (entities[targetKey].health <= 0) {
+      Matter.World.remove(worldRef.current, target);
+      delete entities[targetKey];
+
+      // Add boom effect at the collision point
+      const boom = {
+        body: Matter.Bodies.circle(target.position.x, target.position.y, 30, {
+          isStatic: true,
+          isSensor: true,
+        }),
+        color: 'orange',
+        renderer: Boom,
+        timeout: setTimeout(() => {
+          Matter.World.remove(worldRef.current, boom.body);
+          delete entities[`boom_${boom.body.id}`];
+        }, 300), // Remove boom after 300ms
+      };
+      Matter.World.add(worldRef.current, boom.body);
+      entities[`boom_${boom.body.id}`] = boom;
+
+      // Update score
+      scoreRef.current += 10;
+      setDisplayScore(scoreRef.current);
+    }
   };
 
   // Collision Handling
@@ -179,134 +216,33 @@ export default function GameScreen({ navigation }) {
         const asteroid = bodies.find(b => b.label === 'asteroid');
         const meteor = bodies.find(b => b.label === 'meteor');
 
-        if (bullet && asteroid && !pair.isProcessed) {
+        if (bullet && (asteroid || meteor) && !pair.isProcessed) {
           // Mark the collision pair as processed
           pair.isProcessed = true;
 
-          // Remove bullet from Matter.js world and entities
-          Matter.World.remove(worldRef.current, bullet);
-          Object.keys(entities).forEach(key => {
-            if (entities[key].body === bullet) {
-              delete entities[key];
-            }
-          });
-
-          // Find the asteroid entity in the entities object
-          const asteroidKey = Object.keys(entities).find(key => entities[key].body === asteroid);
-          if (asteroidKey) {
-            // Decrease asteroid health
-            entities[asteroidKey].health -= 1;
-
-            // If asteroid health reaches 0, remove it
-            if (entities[asteroidKey].health <= 0) {
-              Matter.World.remove(worldRef.current, asteroid);
-              delete entities[asteroidKey];
-
-              // Add boom effect at the collision point
-              const boom = {
-                body: Matter.Bodies.circle(asteroid.position.x, asteroid.position.y, 30, {
-                  isStatic: true,
-                  isSensor: true,
-                }),
-                color: 'orange',
-                renderer: Boom,
-                timeout: setTimeout(() => {
-                  Matter.World.remove(worldRef.current, boom.body);
-                  delete entities[`boom_${boom.body.id}`];
-                }, 300), // Remove boom after 300ms
-              };
-              Matter.World.add(worldRef.current, boom.body);
-              entities[`boom_${boom.body.id}`] = boom;
-
-              // Update score
-              scoreRef.current += 10;
-              setDisplayScore(scoreRef.current);
-            }
-          }
-        } else if (bullet && meteor && !pair.isProcessed) {
-          // Mark the collision pair as processed
-          pair.isProcessed = true;
-
-          // Remove bullet from Matter.js world and entities
-          Matter.World.remove(worldRef.current, bullet);
-          Object.keys(entities).forEach(key => {
-            if (entities[key].body === bullet) {
-              delete entities[key];
-            }
-          });
-
-          // Find the meteor entity in the entities object
-          const asteroidKey = Object.keys(entities).find(key => entities[key].body === meteor);
-          if (asteroidKey) {
-            // Decrease meteor health
-            entities[asteroidKey].health -= 1;
-
-            // If meteor health reaches 0, remove it
-            if (entities[asteroidKey].health <= 0) {
-              Matter.World.remove(worldRef.current, meteor);
-              delete entities[asteroidKey];
-
-              // Add boom effect at the collision point
-              const boom = {
-                body: Matter.Bodies.circle(meteor.position.x, meteor.position.y, 30, {
-                  isStatic: true,
-                  isSensor: true,
-                }),
-                color: 'orange',
-                renderer: Boom,
-                timeout: setTimeout(() => {
-                  Matter.World.remove(worldRef.current, boom.body);
-                  delete entities[`boom_${boom.body.id}`];
-                }, 300), // Remove boom after 300ms
-              };
-              Matter.World.add(worldRef.current, boom.body);
-              entities[`boom_${boom.body.id}`] = boom;
-
-              // Update score
-              scoreRef.current += 10;
-              setDisplayScore(scoreRef.current);
-            }
+          const target = asteroid || meteor;
+          const targetKey = Object.keys(entities).find(key => entities[key].body === target);
+          if (targetKey) {
+            handleBulletCollision(entities, bullet, target, targetKey);
           }
         }
 
-        if (bodies.includes(shipRef.current) && bodies.some(b => b.label === 'asteroid')) {
-          // Ensure lives are decremented only once per collision
-          if (!pair.isProcessed) {
+        if (bodies.includes(shipRef.current) && (asteroid || meteor) && !pair.isProcessed) {
+          // Mark the collision pair as processed
+          pair.isProcessed = true;
 
-            // Remove asteroid from Matter.js world
-            Matter.World.remove(worldRef.current, asteroid);
+          // Remove asteroid/meteor from Matter.js world and entities
+          const target = asteroid || meteor;
+          Matter.World.remove(worldRef.current, target);
+          Object.keys(entities).forEach(key => {
+            if (entities[key].body === target) {
+              delete entities[key];
+            }
+          });
 
-            // Remove asteroid from entities
-            Object.keys(entities).forEach(key => {
-              const entity = entities[key];
-              if (entity.body === asteroid) {
-                delete entities[key];
-              }
-            });
-
-            livesRef.current -= 1;
-            setDisplayLives(livesRef.current);
-            pair.isProcessed = true; // Mark the collision as processed
-          }
-        } else if (bodies.includes(shipRef.current) && bodies.some(b => b.label === 'meteor')) {
-          // Ensure lives are decremented only once per collision
-          if (!pair.isProcessed) {
-
-            // Remove meteor from Matter.js world
-            Matter.World.remove(worldRef.current, meteor);
-
-            // Remove meteor from entities
-            Object.keys(entities).forEach(key => {
-              const entity = entities[key];
-              if (entity.body === meteor) {
-                delete entities[key];
-              }
-            });
-
-            livesRef.current -= 1;
-            setDisplayLives(livesRef.current);
-            pair.isProcessed = true; // Mark the collision as processed
-          }
+          // Decrease lives
+          livesRef.current -= 1;
+          setDisplayLives(livesRef.current);
         }
       });
     });

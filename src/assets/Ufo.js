@@ -13,15 +13,18 @@ const Asteroid = ({ body, color, health }) => {
             left: body.position.x - 20,
             top: body.position.y + 30,
             width: 40,
-            height: 5,
+            height: 3,
             backgroundColor: 'red',
+            borderRadius: 6
           }}
         >
           <View
             style={{
               width: (health / 4) * 40,
-              height: 5,
+              height: 3,
               backgroundColor: 'green',
+              borderRadius: 6
+
             }}
           />
         </View>
