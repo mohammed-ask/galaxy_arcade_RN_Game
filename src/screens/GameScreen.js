@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dimensions, StyleSheet, StatusBar, Text, View, Alert } from 'react-native';
+import { Dimensions, StyleSheet, StatusBar, Text, View, Alert, ImageBackground } from 'react-native';
 import Matter from 'matter-js';
 import { GameEngine } from 'react-native-game-engine';
 import Svg, { Polygon, Circle, Rect } from 'react-native-svg';
+import Asteroid from '../assets/Ufo.js';
+import Bullet from '../assets/Bullets.js';
+import Spaceship from '../assets/Spaceship.js';
+import Boom from '../assets/Boom.js';
 
 const { width, height } = Dimensions.get('screen');
 const shipSize = 50;
@@ -12,6 +16,7 @@ export default function GameScreen({ navigation }) {
   const [displayScore, setDisplayScore] = useState(0);
   const [displayLives, setDisplayLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
+  const [levelUp, setLevelUp] = useState(false); // Track level up
   const gameEngine = useRef(null);
 
   // Game state variables
@@ -46,7 +51,19 @@ export default function GameScreen({ navigation }) {
   // Reset game when the component mounts
   useEffect(() => {
     resetGame();
+    return () => {
+      stopGame();
+    };
   }, []);
+
+  // Stop the game
+  const stopGame = () => {
+    Matter.Engine.clear(engineRef.current); // Stop the physics engine
+    Matter.World.clear(worldRef.current, false);
+    if (gameEngine.current) {
+      gameEngine.current.stop(); // Stop the GameEngine
+    }
+  };
 
   // Physics system
   const Physics = (entities, { time }) => {
@@ -77,7 +94,6 @@ export default function GameScreen({ navigation }) {
     bulletCooldown += time.delta;
     if (bulletCooldown > 300) {
       bulletCooldown = 0;
-      console.log(shipRef.current.position.x,' bullet')
       const bullet = Matter.Bodies.rectangle(shipRef.current.position.x, shipRef.current.position.y - 30, 10, 20, {
         label: 'bullet',
         isSensor: true,
@@ -100,8 +116,9 @@ export default function GameScreen({ navigation }) {
       const asteroid = Matter.Bodies.circle(x, 0, 20, {
         label: 'asteroid',
         restitution: 0.5,
+        frictionAir: levelUp ? 0.05 : 0.1
       });
-      Matter.Body.setVelocity(asteroid, { x: 0, y: 1 }); // Reduced asteroid speed
+      Matter.Body.setVelocity(asteroid, { x: 0, y: 5 }); // Reduced asteroid speed
       Matter.World.add(worldRef.current, asteroid);
       entities[`asteroid_${Date.now()}`] = { body: asteroid, color, renderer: Asteroid };
     }
@@ -117,7 +134,10 @@ export default function GameScreen({ navigation }) {
         const bullet = bodies.find(b => b.label === 'bullet');
         const asteroid = bodies.find(b => b.label === 'asteroid');
 
-        if (bullet && asteroid) {
+        if (bullet && asteroid && !pair.isProcessed) {
+          // Mark the collision pair as processed
+          pair.isProcessed = true;
+
           // Remove bullet and asteroid from Matter.js world
           Matter.World.remove(worldRef.current, bullet);
           Matter.World.remove(worldRef.current, asteroid);
@@ -130,6 +150,21 @@ export default function GameScreen({ navigation }) {
             }
           });
 
+          // Add boom effect at the collision point
+          const boom = {
+            body: Matter.Bodies.circle(bullet.position.x, bullet.position.y, 30, {
+              isStatic: true,
+              isSensor: true,
+            }),
+            renderer: Boom,
+            timeout: setTimeout(() => {
+              Matter.World.remove(worldRef.current, boom.body);
+              delete entities[`boom_${boom.body.id}`];
+            }, 300), // Remove boom after 300ms
+          };
+          Matter.World.add(worldRef.current, boom.body);
+          entities[`boom_${boom.body.id}`] = boom;
+
           // Update score only when bullet hits asteroid
           scoreRef.current += 10;
           setDisplayScore(scoreRef.current);
@@ -138,6 +173,18 @@ export default function GameScreen({ navigation }) {
         if (bodies.includes(shipRef.current) && bodies.some(b => b.label === 'asteroid')) {
           // Ensure lives are decremented only once per collision
           if (!pair.isProcessed) {
+
+            // Remove asteroid from Matter.js world
+            Matter.World.remove(worldRef.current, asteroid);
+
+            // Remove asteroid from entities
+            Object.keys(entities).forEach(key => {
+              const entity = entities[key];
+              if (entity.body === asteroid) {
+                delete entities[key];
+              }
+            });
+
             livesRef.current -= 1;
             setDisplayLives(livesRef.current);
             pair.isProcessed = true; // Mark the collision as processed
@@ -173,7 +220,7 @@ export default function GameScreen({ navigation }) {
   }, [displayLives, gameOver, navigation]);
 
   return (
-    <View style={styles.container}>
+    <ImageBackground source={require('../assets/imgaes/background2.jpg')} resizeMode='cover' style={styles.containerImg}>
       <GameEngine
         ref={gameEngine}
         style={styles.container}
@@ -188,32 +235,13 @@ export default function GameScreen({ navigation }) {
         <Text style={styles.score}>Score: {displayScore}</Text>
         <Text style={styles.lives}>Lives: {displayLives}</Text>
       </GameEngine>
-    </View>
+    </ImageBackground>
   );
 }
 
-// Render Components
-const Spaceship = ({ body }) => (
-  <Svg width={shipSize} height={shipSize} style={{ position: 'absolute', left: body.position.x - shipSize / 2, top: body.position.y - shipSize / 2 }}>
-    {console.log(body.position.x,' bodypos')}
-    <Polygon points="25,0 0,50 50,50" fill="white" />
-  </Svg>
-);
-
-const Asteroid = ({ body, color }) => (
-  <Svg width={40} height={40} style={{ position: 'absolute', left: body.position.x - 20, top: body.position.y - 20 }}>
-    <Circle cx="20" cy="20" r="20" fill={color} />
-  </Svg>
-);
-
-const Bullet = ({ body }) => (
-  <Svg width={10} height={20} style={{ position: 'absolute', left: body.position.x - 5, top: body.position.y - 10 }}>
-    <Rect width="10" height="20" fill="yellow" />
-  </Svg>
-);
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  containerImg: { flex: 1, zIndex: 2 },
+  container: { flex: 1 },
   score: { position: 'absolute', top: 40, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
   lives: { position: 'absolute', top: 80, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' }
 });
