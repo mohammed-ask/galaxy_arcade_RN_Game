@@ -16,6 +16,8 @@ export default function GameScreen({ navigation }) {
   const [displayLives, setDisplayLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
   const [levelUp, setLevelUp] = useState(false); // Track level up
+  const [level3, setLevel3] = useState(false); // Track level 3
+  const [megaSpawned, setMegaSpawned] = useState(false); // Track if mega is spawned
   const gameEngine = useRef(null);
 
   // Game state variables
@@ -37,6 +39,9 @@ export default function GameScreen({ navigation }) {
     setDisplayLives(3);
     setDisplayScore(0);
     setGameOver(false);
+    setLevelUp(false);
+    setLevel3(false);
+    setMegaSpawned(false);
 
     // Clear the Matter.js world and reinitialize
     Matter.Engine.clear(engineRef.current);
@@ -57,10 +62,13 @@ export default function GameScreen({ navigation }) {
 
   // Check for level up
   useEffect(() => {
-    if (scoreRef.current >= 20 && !levelUp) {
+    if (scoreRef.current >= 200 && !levelUp) {
       setLevelUp(true); // Activate level up
     }
-  }, [displayScore, levelUp]);
+    if (scoreRef.current >= 500 && !level3) {
+      setLevel3(true); // Activate level 3
+    }
+  }, [displayScore, levelUp, level3]);
 
   // Stop the game
   const stopGame = () => {
@@ -95,9 +103,9 @@ export default function GameScreen({ navigation }) {
   };
 
   // Create a bullet
-  const createBullet = (x, y) => {
+  const createBullet = (x, y, isEnemyBullet = false) => {
     return Matter.Bodies.rectangle(x, y, 10, 20, {
-      label: 'bullet',
+      label: isEnemyBullet ? 'enemyBullet' : 'bullet',
       isSensor: true,
       frictionAir: 0,
       inertia: Infinity,
@@ -142,18 +150,74 @@ export default function GameScreen({ navigation }) {
   };
 
   // Create an asteroid or meteor
-  const createAsteroid = (x, y, isMeteor) => {
+  const createAsteroid = (x, y, isMeteor = false, isMega = false) => {
     return Matter.Bodies.circle(x, y, 20, {
-      label: isMeteor ? 'meteor' : 'asteroid',
+      label: isMega ? 'mega' : isMeteor ? 'meteor' : 'asteroid',
       restitution: 0.5,
-      frictionAir: isMeteor ? 0.05 : 0.1,
-      health: isMeteor ? 4 : 1,
+      frictionAir: isMega ? 0.6 : isMeteor ? 0.15 : 0.1,
+      health: isMega ? 15 : isMeteor ? 4 : 1,
     });
   };
 
+  // Create 10 asteroids when mega is destroyed
+  const spawnAsteroids = (x, y, entities) => {
+    for (let i = 0; i < 4; i++) {
+      const asteroid = createAsteroid(x, y);
+      Matter.Body.setVelocity(asteroid, { x: (Math.random() - 0.5) * 2, y: 5 });
+      Matter.World.add(worldRef.current, asteroid);
+      entities[`asteroid_${Date.now()}_${i}`] = { body: asteroid, color: colors[Math.floor(Math.random() * colors.length)], renderer: Asteroid, health: 1 };
+    }
+  };
+
+  // Mega enemy shooting bullets
+  const megaShoot = (mega, entities) => {
+    const bullet = createBullet(mega.position.x, mega.position.y + 30, true);
+    Matter.Body.setVelocity(bullet, { x: 0, y: 3 }); // Bullet speed
+    Matter.World.add(worldRef.current, bullet);
+    entities[`enemyBullet_${Date.now()}`] = { body: bullet, color: 'red', renderer: Bullet };
+  };
+
+
+  // Move mega with sinusoidal pattern
+  const moveMega = (entities, { time }) => {
+    Object.keys(entities).forEach((key) => {
+      const entity = entities[key];
+      if (entity?.body?.label === 'mega') {
+        const t = time.current / 1000;
+        const amplitude = 100; // Horizontal movement range
+        const frequency = 0.5; // Oscillation speed
+        const x = entity.body.position.x + Math.sin(t * frequency) * amplitude * 0.05;
+
+        // Keep the mega within screen bounds
+        const clampedX = Math.max(30, Math.min(width - 30, x));
+
+        // Apply slower vertical movement
+        const fallSpeed = 0.01; // Reduce for slower falling
+        Matter.Body.setPosition(entity.body, {
+          x: clampedX,
+          y: entity.body.position.y + fallSpeed,
+        });
+      }
+    });
+    return entities;
+  };
+
   // Asteroid Spawner
-  const AsteroidSpawner = (entities) => {
+  const AsteroidSpawner = (entities, { time }) => {
     const isMeteor = levelUp && generateEvenOdd();
+
+    // Spawn mega only once when level 3 is active
+    if (level3 && !megaSpawned) {
+      const x = Math.random() * width;
+      const mega = createAsteroid(x, 0, false, true);
+      Matter.Body.setVelocity(mega, { x: (Math.random() - 0.5) * 2, y: 2 }); // Random X movement, slow Y movement
+      Matter.World.add(worldRef.current, mega);
+      entities[`mega_${Date.now()}`] = { body: mega, color: 'purple', renderer: Asteroid, health: 20 };
+      setMegaSpawned(true); // Mark mega as spawned
+    }
+
+
+
     if (Math.random() < 0.015) {
       const x = Math.random() * width;
       const color = colors[Math.floor(Math.random() * colors.length)];
@@ -163,10 +227,19 @@ export default function GameScreen({ navigation }) {
       const key = isMeteor ? `meteor_${Date.now()}` : `asteroid_${Date.now()}`;
       entities[key] = { body: asteroid, color, renderer: Asteroid, health: asteroid.health };
     }
+
+    // Mega shooting logic
+    Object.keys(entities).forEach(key => {
+      const entity = entities[key];
+      if (entity?.body?.label === 'mega' && Math.random() < 0.01) {
+        megaShoot(entity.body, entities);
+      }
+    });
+
     return entities;
   };
 
-  // Handle collision between bullet and asteroid/meteor
+  // Handle collision between bullet and asteroid/meteor/mega
   const handleBulletCollision = (entities, bullet, target, targetKey) => {
     // Remove bullet from Matter.js world and entities
     Matter.World.remove(worldRef.current, bullet);
@@ -203,6 +276,12 @@ export default function GameScreen({ navigation }) {
       // Update score
       scoreRef.current += 10;
       setDisplayScore(scoreRef.current);
+
+      // If mega is destroyed, spawn 10 asteroids
+      if (target.label === 'mega') {
+        spawnAsteroids(target.position.x, target.position.y, entities);
+        setMegaSpawned(false); // Reset mega spawn flag
+      }
     }
   };
 
@@ -213,29 +292,30 @@ export default function GameScreen({ navigation }) {
         const bodies = [pair.bodyA, pair.bodyB];
 
         const bullet = bodies.find(b => b.label === 'bullet');
+        const enemyBullet = bodies.find(b => b.label === 'enemyBullet');
         const asteroid = bodies.find(b => b.label === 'asteroid');
         const meteor = bodies.find(b => b.label === 'meteor');
+        const mega = bodies.find(b => b.label === 'mega');
 
-        if (bullet && (asteroid || meteor) && !pair.isProcessed) {
+        if (bullet && (asteroid || meteor || mega) && !pair.isProcessed) {
           // Mark the collision pair as processed
           pair.isProcessed = true;
 
-          const target = asteroid || meteor;
+          const target = asteroid || meteor || mega;
           const targetKey = Object.keys(entities).find(key => entities[key].body === target);
           if (targetKey) {
             handleBulletCollision(entities, bullet, target, targetKey);
           }
         }
 
-        if (bodies.includes(shipRef.current) && (asteroid || meteor) && !pair.isProcessed) {
+        if (enemyBullet && bodies.includes(shipRef.current) && !pair.isProcessed) {
           // Mark the collision pair as processed
           pair.isProcessed = true;
 
-          // Remove asteroid/meteor from Matter.js world and entities
-          const target = asteroid || meteor;
-          Matter.World.remove(worldRef.current, target);
+          // Remove enemy bullet from Matter.js world and entities
+          Matter.World.remove(worldRef.current, enemyBullet);
           Object.keys(entities).forEach(key => {
-            if (entities[key].body === target) {
+            if (entities[key].body === enemyBullet) {
               delete entities[key];
             }
           });
@@ -243,6 +323,30 @@ export default function GameScreen({ navigation }) {
           // Decrease lives
           livesRef.current -= 1;
           setDisplayLives(livesRef.current);
+        }
+
+        if (bodies.includes(shipRef.current) && (asteroid || meteor || mega) && !pair.isProcessed) {
+          // Mark the collision pair as processed
+          pair.isProcessed = true;
+
+          // If mega collides with spaceship, game over instantly
+          if (mega) {
+            livesRef.current = 0;
+            setDisplayLives(0);
+          } else {
+            // Remove asteroid/meteor from Matter.js world and entities
+            const target = asteroid || meteor;
+            Matter.World.remove(worldRef.current, target);
+            Object.keys(entities).forEach(key => {
+              if (entities[key].body === target) {
+                delete entities[key];
+              }
+            });
+
+            // Decrease lives
+            livesRef.current -= 1;
+            setDisplayLives(livesRef.current);
+          }
         }
       });
     });
@@ -278,7 +382,7 @@ export default function GameScreen({ navigation }) {
       <GameEngine
         ref={gameEngine}
         style={styles.container}
-        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, handleCollisions, CleanupEntities]}
+        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, handleCollisions, CleanupEntities, moveMega]}
         entities={{
           physics: { engine: engineRef.current, world: worldRef.current },
           spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship },

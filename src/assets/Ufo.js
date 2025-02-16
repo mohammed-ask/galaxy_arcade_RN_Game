@@ -4,7 +4,7 @@ import { Image, StyleSheet, View } from 'react-native';
 const Asteroid = ({ body, color, health }) => {
   return (
     <>
-      {body.label === 'asteroid' ? <Image source={require('../assets/imgaes/asteroid.png')} style={{ ...styles.imgStyle, left: body.position.x - 20, top: body.position.y - 20 }} /> : <Image source={require('../assets/imgaes/meteor.png')} style={{ ...styles.imgStyle, left: body.position.x - 20, top: body.position.y - 20 }} />
+      {body.label === 'asteroid' ? <Image source={require('../assets/imgaes/asteroid.png')} style={{ ...styles.imgStyle, left: body.position.x - 20, top: body.position.y - 20 }} /> : body.label === 'meteor' ? <Image source={require('../assets/imgaes/meteor.png')} style={{ ...styles.imgStyle, left: body.position.x - 20, top: body.position.y - 20 }} /> : <Image source={require('../assets/imgaes/mega.png')} style={{ ...styles.imgStyle, width: 60, height: 60, left: body.position.x - 20, top: body.position.y - 20 }} />
       }
       {body.label === 'meteor' && (
         <View
@@ -21,6 +21,29 @@ const Asteroid = ({ body, color, health }) => {
           <View
             style={{
               width: (health / 4) * 40,
+              height: 3,
+              backgroundColor: 'green',
+              borderRadius: 6
+
+            }}
+          />
+        </View>
+      )}
+      {body.label === 'mega' && (
+        <View
+          style={{
+            position: 'absolute',
+            left: body.position.x - 20,
+            top: body.position.y + 50,
+            width: 60,
+            height: 3,
+            backgroundColor: 'red',
+            borderRadius: 6
+          }}
+        >
+          <View
+            style={{
+              width: (health / 15) * 45,
               height: 3,
               backgroundColor: 'green',
               borderRadius: 6
