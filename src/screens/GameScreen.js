@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dimensions, StyleSheet, StatusBar, Text, View, Alert, ImageBackground } from 'react-native';
+import { Dimensions, StyleSheet, StatusBar, Text, View, Alert, ImageBackground, Modal, TouchableOpacity, BackHandler } from 'react-native';
 import Matter from 'matter-js';
 import { GameEngine } from 'react-native-game-engine';
 import Asteroid from '../assets/Ufo.js';
 import Bullet from '../assets/Bullets.js';
 import Spaceship from '../assets/Spaceship.js';
 import Boom from '../assets/Boom.js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import TouchableScale from 'react-native-touchable-scale';
 
 const { width, height } = Dimensions.get('screen');
 const shipSize = 50;
@@ -19,6 +21,9 @@ export default function GameScreen({ navigation }) {
   const [level3, setLevel3] = useState(false); // Track level 3
   const [megaSpawned, setMegaSpawned] = useState(false); // Track if mega is spawned
   const gameEngine = useRef(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [gamePause, setGamePause] = useState(false);
+  const [showPauseModal, setShowPauseModal] = useState(false);
 
   // Game state variables
   const livesRef = useRef(3);
@@ -26,6 +31,15 @@ export default function GameScreen({ navigation }) {
   const engineRef = useRef(Matter.Engine.create({ enableSleeping: false }));
   const worldRef = useRef(engineRef.current.world);
   const shipRef = useRef(Matter.Bodies.rectangle(width / 2, height - shipSize * 2, shipSize, shipSize, { isStatic: true }));
+
+  //Update Best Score
+  const updateBestScore = async (currentScore) => {
+    const bestScore = await AsyncStorage.getItem('bestScore');
+    if (!bestScore || currentScore > parseInt(bestScore)) {
+      await AsyncStorage.setItem('bestScore', currentScore.toString());
+      setUserDetail((prev) => ({ ...prev, bestScore: currentScore.toString() }));
+    }
+  };
 
   // Initialize Matter.js world
   const initializeWorld = () => {
@@ -55,6 +69,13 @@ export default function GameScreen({ navigation }) {
   // Reset game when the component mounts
   useEffect(() => {
     resetGame();
+    // Handle back button press
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      pauseGame() // Stop the game when back button is pressed
+      setShowPauseModal(true) // Navigate back to the previous screen
+      return true; // Prevent default behavior
+    });
+
     return () => {
       stopGame();
     };
@@ -69,6 +90,11 @@ export default function GameScreen({ navigation }) {
       setLevel3(true); // Activate level 3
     }
   }, [displayScore, levelUp, level3]);
+
+  //Pause Game
+  const pauseGame = () => {
+    setGamePause(true)
+  }
 
   // Stop the game
   const stopGame = () => {
@@ -263,7 +289,6 @@ export default function GameScreen({ navigation }) {
           isStatic: true,
           isSensor: true,
         }),
-        color: 'orange',
         renderer: Boom,
         timeout: setTimeout(() => {
           Matter.World.remove(worldRef.current, boom.body);
@@ -343,6 +368,21 @@ export default function GameScreen({ navigation }) {
               }
             });
 
+            // Add boom effect at the collision point
+            const boom = {
+              body: Matter.Bodies.circle(target.position.x, target.position.y, 30, {
+                isStatic: true,
+                isSensor: true,
+              }),
+              renderer: Boom,
+              timeout: setTimeout(() => {
+                Matter.World.remove(worldRef.current, boom.body);
+                delete entities[`boom_${boom.body.id}`];
+              }, 300), // Remove boom after 300ms
+            };
+            Matter.World.add(worldRef.current, boom.body);
+            entities[`boom_${boom.body.id}`] = boom;
+
             // Decrease lives
             livesRef.current -= 1;
             setDisplayLives(livesRef.current);
@@ -370,9 +410,10 @@ export default function GameScreen({ navigation }) {
   useEffect(() => {
     if (livesRef.current <= 0 && !gameOver) {
       setGameOver(true);
-      Alert.alert('Game Over!', `Final Score: ${scoreRef.current}`, [
-        { text: 'OK', onPress: () => navigation.navigate('MainMenu') },
-      ]);
+      setModalVisible(true), updateBestScore(scoreRef.current)
+      // Alert.alert('Game Over!', `Final Score: ${scoreRef.current}`, [
+      //   { text: 'OK', onPress: () => { setModalVisible(true), updateBestScore(scoreRef.current) } },
+      // ]);
       Matter.Engine.clear(engineRef.current); // Stop the physics engine
     }
   }, [displayLives, gameOver, navigation]);
@@ -387,12 +428,41 @@ export default function GameScreen({ navigation }) {
           physics: { engine: engineRef.current, world: worldRef.current },
           spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship },
         }}
-        running={!gameOver} // Stop the game loop when game is over
+        running={!gameOver && !gamePause} // Stop the game loop when game is over
       >
         <StatusBar hidden={true} />
         <Text style={styles.score}>Score: {displayScore}</Text>
         <Text style={styles.lives}>Lives: {displayLives}</Text>
       </GameEngine>
+      {/* Modal for User Name Input */}
+      <Modal animationType="fade" transparent={true} visible={modalVisible}>
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent]}>
+            <Text style={styles.modalTitle}>GAME OVER</Text>
+
+            <TouchableScale style={styles.modalButton} onPress={() => { resetGame(); setModalVisible(false) }}>
+              <Text style={styles.modalButtonText}>Play Again</Text>
+            </TouchableScale>
+            <TouchableScale onPress={() => navigation.navigate('MainMenu')} style={styles.modalButton} >
+              <Text style={styles.modalButtonText}>Main Menu</Text>
+            </TouchableScale>
+          </View>
+        </View>
+      </Modal>
+      <Modal animationType="fade" transparent={true} visible={showPauseModal}>
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent]}>
+            <Text style={styles.modalTitle}>GAME PAUSE</Text>
+
+            <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false), setShowPauseModal(false) }}>
+              <Text style={styles.modalButtonText}>Resume</Text>
+            </TouchableScale>
+            <TouchableScale onPress={() => navigation.navigate('MainMenu')} style={styles.modalButton} >
+              <Text style={styles.modalButtonText}>Go Back</Text>
+            </TouchableScale>
+          </View>
+        </View>
+      </Modal>
     </ImageBackground>
   );
 }
@@ -401,5 +471,44 @@ const styles = StyleSheet.create({
   containerImg: { flex: 1, zIndex: 2 },
   container: { flex: 1 },
   score: { position: 'absolute', top: 40, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
-  lives: { position: 'absolute', top: 80, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' }
+  lives: { position: 'absolute', top: 80, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)'
+  },
+  modalContent: {
+    backgroundColor: '#222',
+    padding: 30,
+    borderRadius: 20,
+    alignItems: 'center',
+    width: '80%',
+    borderWidth: 3,
+    borderColor: '#6200EE',
+    elevation: 10
+  },
+  modalTitle: {
+    fontSize: 20,
+    marginBottom: 20,
+    color: '#FFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 5,
+    fontFamily: 'Audiowide-Regular',
+  },
+  modalButton: {
+    marginTop: 20,
+    backgroundColor: '#6200EE',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    elevation: 5,
+    shadowColor: '#fff'
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Audiowide-Regular',
+  },
 });
