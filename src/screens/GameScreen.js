@@ -135,6 +135,23 @@ export default function GameScreen({ navigation }) {
       isSensor: true,
       frictionAir: 0,
       inertia: Infinity,
+      // friction: 0,
+      // restitution: 0,
+      // collisionFilter: {
+      //   category: 0x0002, // Assign a collision category
+      //   mask: 0x0001, // Collide with enemies (category 0x0001)
+      // },
+      // force: { x: 0, y: -0.03 }, // Apply force to move the bullet
+      // velocity: { x: 0, y: -5 }, // Set initial velocity
+      // angularVelocity: 0,
+      // isStatic: false,
+      // chamfer: { radius: 10 },
+      // render: {
+      //   fillStyle: 'yellow',
+      // },
+      // // Enable CCD for fast-moving bullets
+      // collisionResponse: true,
+      // isBullet: true, // Mark as a bullet for CCD
     });
   };
 
@@ -159,7 +176,7 @@ export default function GameScreen({ navigation }) {
         entities[`bullet_${Date.now()}_2`] = { body: bullet2, color: 'yellow', renderer: Bullet };
       } else {
         // Fire single bullet
-        const bullet = createBullet(shipRef.current.position.x, shipRef.current.position.y - 30);
+        const bullet = createBullet(shipRef.current.position.x + 3, shipRef.current.position.y - 30);
         Matter.Body.setVelocity(bullet, { x: 0, y: -5 });
         Matter.Body.set(bullet, { force: { x: 0, y: -0.03 } });
         Matter.World.add(worldRef.current, bullet);
@@ -177,7 +194,7 @@ export default function GameScreen({ navigation }) {
 
   // Create an asteroid or meteor
   const createAsteroid = (x, y, isMeteor = false, isMega = false) => {
-    return Matter.Bodies.circle(x, y, 20, {
+    return Matter.Bodies.circle(x, y, 40, {
       label: isMega ? 'mega' : isMeteor ? 'meteor' : 'asteroid',
       restitution: 0.5,
       frictionAir: isMega ? 0.6 : isMeteor ? 0.15 : 0.1,
@@ -383,6 +400,19 @@ export default function GameScreen({ navigation }) {
             Matter.World.add(worldRef.current, boom.body);
             entities[`boom_${boom.body.id}`] = boom;
 
+            // Trigger blinking effect
+            const shipEntity = entities.spaceship;
+            if (shipEntity && shipRef.current) {
+              shipEntity.isVisible = false;
+            }
+            // setIsBlinking(true);
+            setTimeout(() => {
+              const shipEntity = entities.spaceship;
+              if (shipEntity && shipRef.current) {
+                shipEntity.isVisible = true;
+              }
+            }, 500); // 500ms blink
+
             // Decrease lives
             livesRef.current -= 1;
             setDisplayLives(livesRef.current);
@@ -426,7 +456,7 @@ export default function GameScreen({ navigation }) {
         systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, handleCollisions, CleanupEntities, moveMega]}
         entities={{
           physics: { engine: engineRef.current, world: worldRef.current },
-          spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship },
+          spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true },
         }}
         running={!gameOver && !gamePause} // Stop the game loop when game is over
       >
@@ -443,7 +473,7 @@ export default function GameScreen({ navigation }) {
             <TouchableScale style={styles.modalButton} onPress={() => { resetGame(); setModalVisible(false) }}>
               <Text style={styles.modalButtonText}>Play Again</Text>
             </TouchableScale>
-            <TouchableScale onPress={() => navigation.navigate('MainMenu')} style={styles.modalButton} >
+            <TouchableScale onPress={() => navigation.replace('MainMenu')} style={styles.modalButton} >
               <Text style={styles.modalButtonText}>Main Menu</Text>
             </TouchableScale>
           </View>
@@ -457,7 +487,7 @@ export default function GameScreen({ navigation }) {
             <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false), setShowPauseModal(false) }}>
               <Text style={styles.modalButtonText}>Resume</Text>
             </TouchableScale>
-            <TouchableScale onPress={() => navigation.navigate('MainMenu')} style={styles.modalButton} >
+            <TouchableScale onPress={() => navigation.replace('MainMenu')} style={styles.modalButton} >
               <Text style={styles.modalButtonText}>Go Back</Text>
             </TouchableScale>
           </View>

@@ -110,6 +110,10 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation 'com.facebook.fresco:fresco:1.+'
+
+    // For animated GIF support
+    implementation 'com.facebook.fresco:animated-gif:3.3.0'
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

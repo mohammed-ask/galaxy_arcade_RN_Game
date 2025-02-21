@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Image, Modal, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Image, Modal, TextInput, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TouchableScale from 'react-native-touchable-scale';
+// import FastImage from 'react-native-fast-image';
 // import { Ionicons } from '@expo/vector-icons';
 
 const MainMenuScreen = () => {
@@ -47,43 +48,34 @@ const MainMenuScreen = () => {
     setModalVisible(false);
   };
 
-  const coinImages = [
-    require('../assets/imgaes/goldcoin1.png'),
-    require('../assets/imgaes/goldcoin2.png'),
-    require('../assets/imgaes/goldcoin3.png'),
-    require('../assets/imgaes/goldcoin4.png'),
-    require('../assets/imgaes/goldcoin5.png'),
-    require('../assets/imgaes/goldcoin6.png'),
-  ];
-
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentFrame((prev) => (prev + 1) % coinImages.length);
-    }, 150); // Adjust speed as needed
-    return () => clearInterval(interval);
-  }, []);
-
+  const handleNavigation = (screenName) => {
+    navigation.navigate(screenName)
+  }
 
   return (
     <ImageBackground source={require('../assets/imgaes/background2.jpg')} style={styles.background}>
       <View style={styles.container}>
         <View style={{ marginHorizontal: 15, paddingVertical: 5, borderRadius: 30, borderWidth: 5, borderColor: '#000', width: 100, backgroundColor: '#6200EE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          <Image source={coinImages[currentFrame]} style={styles.coin} />
+          {/* <FastImage
+            resizeMode="contain"
+            style={{ width: 70, height: 70 }}
+            source={require('../assets/imgaes/goldcoin.gif')}
+          /> */}
+          <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
           <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>0</Text>
         </View>
         <Text style={styles.title}>Hyy, {userDetail.userName}</Text>
         <Text style={styles.score}>Best Score: {userDetail.bestScore}</Text>
-        <TouchableScale style={styles.button} onPress={() => navigation.navigate('Game')}>
+        <TouchableScale style={styles.button} onPress={() => handleNavigation('Game')}>
           <Text style={styles.buttonText}>Start Game</Text>
         </TouchableScale>
-        <TouchableScale style={styles.button} onPress={() => navigation.navigate('Upgrades')}>
+        <TouchableScale style={styles.button} onPress={() => handleNavigation('Upgrades')}>
           <Text style={styles.buttonText}>Shop</Text>
         </TouchableScale>
-        <TouchableScale style={styles.button} onPress={() => navigation.navigate('Leaderboard')}>
+        <TouchableScale style={styles.button} onPress={() => handleNavigation('Leaderboard')}>
           <Text style={styles.buttonText}>Leaderboard</Text>
         </TouchableScale>
-        <TouchableScale style={styles.button} onPress={() => navigation.navigate('Settings')}>
+        <TouchableScale style={styles.button} onPress={() => handleNavigation('Settings')}>
           <Text style={styles.buttonText}>Settings</Text>
         </TouchableScale>
 
