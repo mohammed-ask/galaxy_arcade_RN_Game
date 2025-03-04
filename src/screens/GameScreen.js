@@ -6,6 +6,7 @@ import Asteroid from '../assets/Ufo.js';
 import Bullet from '../assets/Bullets.js';
 import Spaceship from '../assets/Spaceship.js';
 import Boom from '../assets/Boom.js';
+import Coin from '../assets/Coin.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TouchableScale from 'react-native-touchable-scale';
 
@@ -16,18 +17,20 @@ const colors = ['red', 'blue', 'orange'];
 export default function GameScreen({ navigation }) {
   const [displayScore, setDisplayScore] = useState(0);
   const [displayLives, setDisplayLives] = useState(3);
+  const [displayCoins, setDisplayCoins] = useState(0); // Coin counter
   const [gameOver, setGameOver] = useState(false);
+  const [gamePause, setGamePause] = useState(false);
   const [levelUp, setLevelUp] = useState(false); // Track level up
   const [level3, setLevel3] = useState(false); // Track level 3
   const [megaSpawned, setMegaSpawned] = useState(false); // Track if mega is spawned
   const gameEngine = useRef(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [gamePause, setGamePause] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
 
   // Game state variables
   const livesRef = useRef(3);
   const scoreRef = useRef(0);
+  const coinsRef = useRef(0); // Track collected coins
   const engineRef = useRef(Matter.Engine.create({ enableSleeping: false }));
   const worldRef = useRef(engineRef.current.world);
   const shipRef = useRef(Matter.Bodies.rectangle(width / 2, height - shipSize * 2, shipSize, shipSize, { isStatic: true }));
@@ -46,12 +49,33 @@ export default function GameScreen({ navigation }) {
     Matter.World.add(worldRef.current, shipRef.current);
   };
 
+  const clearEntities = () => {
+    // Clear all bodies from the Matter.js world except the ship
+    Matter.World.clear(worldRef.current, false);
+
+    // Re-add the ship to the world
+    Matter.World.add(worldRef.current, shipRef.current);
+
+    // Clear all entities from the GameEngine except the ship
+    if (gameEngine.current) {
+      gameEngine.current.swap({
+        physics: { engine: engineRef.current, world: worldRef.current },
+        spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true },
+      });
+    }
+  };
+
   // Reset game state
   const resetGame = () => {
+    // Clear all entities
+    clearEntities();
+
     livesRef.current = 3;
     scoreRef.current = 0;
+    coinsRef.current = 0; // Reset coin count
     setDisplayLives(3);
     setDisplayScore(0);
+    setDisplayCoins(0);
     setGameOver(false);
     setLevelUp(false);
     setLevel3(false);
@@ -90,6 +114,18 @@ export default function GameScreen({ navigation }) {
       setLevel3(true); // Activate level 3
     }
   }, [displayScore, levelUp, level3]);
+
+  // Check for game over
+  useEffect(() => {
+    if (livesRef.current <= 0 && !gameOver) {
+      updateBestScore(scoreRef.current)
+      setTimeout(() => {
+        setGameOver(true);
+      }, 300);
+      setModalVisible(true)
+      stopGame()
+    }
+  }, [displayLives, gameOver, navigation]);
 
   //Pause Game
   const pauseGame = () => {
@@ -135,23 +171,6 @@ export default function GameScreen({ navigation }) {
       isSensor: true,
       frictionAir: 0,
       inertia: Infinity,
-      // friction: 0,
-      // restitution: 0,
-      // collisionFilter: {
-      //   category: 0x0002, // Assign a collision category
-      //   mask: 0x0001, // Collide with enemies (category 0x0001)
-      // },
-      // force: { x: 0, y: -0.03 }, // Apply force to move the bullet
-      // velocity: { x: 0, y: -5 }, // Set initial velocity
-      // angularVelocity: 0,
-      // isStatic: false,
-      // chamfer: { radius: 10 },
-      // render: {
-      //   fillStyle: 'yellow',
-      // },
-      // // Enable CCD for fast-moving bullets
-      // collisionResponse: true,
-      // isBullet: true, // Mark as a bullet for CCD
     });
   };
 
@@ -220,7 +239,6 @@ export default function GameScreen({ navigation }) {
     entities[`enemyBullet_${Date.now()}`] = { body: bullet, color: 'red', renderer: Bullet };
   };
 
-
   // Move mega with sinusoidal pattern
   const moveMega = (entities, { time }) => {
     Object.keys(entities).forEach((key) => {
@@ -282,6 +300,30 @@ export default function GameScreen({ navigation }) {
     return entities;
   };
 
+  // Coin Spawner
+  const CoinSpawner = (entities) => {
+    if (Math.random() < 0.002) { // Adjust spawn rate as needed
+      const x = Math.random() * width; // Random X position
+      const y = 0; // Start at the top of the screen
+      const spacing = 50; // Vertical spacing between coins
+      const numCoins = 5; // Number of coins in a vertical line
+
+      for (let i = 0; i < numCoins; i++) {
+        const coin = Matter.Bodies.circle(x, y + i * spacing, 10, {
+          label: 'coin',
+          isSensor: true,
+          restitution: 1,
+          frictionAir: 0.1,
+          friction: 0.1
+        });
+        Matter.Body.setVelocity(coin, { x: 0, y: 1 }); // Move coins downward
+        Matter.World.add(worldRef.current, coin);
+        entities[`coin_${Date.now()}_${i}`] = { body: coin, renderer: Coin };
+      }
+    }
+    return entities;
+  };
+
   // Handle collision between bullet and asteroid/meteor/mega
   const handleBulletCollision = (entities, bullet, target, targetKey) => {
     // Remove bullet from Matter.js world and entities
@@ -338,7 +380,10 @@ export default function GameScreen({ navigation }) {
         const asteroid = bodies.find(b => b.label === 'asteroid');
         const meteor = bodies.find(b => b.label === 'meteor');
         const mega = bodies.find(b => b.label === 'mega');
+        const coin = bodies.find(b => b.label === 'coin');
+        const shipBody = bodies.find(b => b === shipRef.current);
 
+        // Handle bullet-asteroid collision
         if (bullet && (asteroid || meteor || mega) && !pair.isProcessed) {
           // Mark the collision pair as processed
           pair.isProcessed = true;
@@ -348,6 +393,24 @@ export default function GameScreen({ navigation }) {
           if (targetKey) {
             handleBulletCollision(entities, bullet, target, targetKey);
           }
+        }
+
+        // Handle ship-coin collision
+        if (shipBody && coin && !pair.isProcessed) {
+          // Mark the collision pair as processed
+          pair.isProcessed = true;
+
+          // Remove coin from Matter.js world and entities
+          Matter.World.remove(worldRef.current, coin);
+          Object.keys(entities).forEach(key => {
+            if (entities[key].body === coin) {
+              delete entities[key];
+            }
+          });
+
+          // Increment coin count
+          coinsRef.current += 1;
+          setDisplayCoins(coinsRef.current);
         }
 
         if (enemyBullet && bodies.includes(shipRef.current) && !pair.isProcessed) {
@@ -436,24 +499,12 @@ export default function GameScreen({ navigation }) {
     return entities;
   };
 
-  // Check for game over
-  useEffect(() => {
-    if (livesRef.current <= 0 && !gameOver) {
-      setGameOver(true);
-      setModalVisible(true), updateBestScore(scoreRef.current)
-      // Alert.alert('Game Over!', `Final Score: ${scoreRef.current}`, [
-      //   { text: 'OK', onPress: () => { setModalVisible(true), updateBestScore(scoreRef.current) } },
-      // ]);
-      Matter.Engine.clear(engineRef.current); // Stop the physics engine
-    }
-  }, [displayLives, gameOver, navigation]);
-
   return (
     <ImageBackground source={require('../assets/imgaes/background2.jpg')} resizeMode='cover' style={styles.containerImg}>
       <GameEngine
         ref={gameEngine}
         style={styles.container}
-        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, handleCollisions, CleanupEntities, moveMega]}
+        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, handleCollisions, CleanupEntities, moveMega]}
         entities={{
           physics: { engine: engineRef.current, world: worldRef.current },
           spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true },
@@ -463,6 +514,7 @@ export default function GameScreen({ navigation }) {
         <StatusBar hidden={true} />
         <Text style={styles.score}>Score: {displayScore}</Text>
         <Text style={styles.lives}>Lives: {displayLives}</Text>
+        <Text style={styles.coins}>Coins: {displayCoins}</Text>
       </GameEngine>
       {/* Modal for User Name Input */}
       <Modal animationType="fade" transparent={true} visible={modalVisible}>
@@ -502,6 +554,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   score: { position: 'absolute', top: 40, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
   lives: { position: 'absolute', top: 80, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
+  coins: { position: 'absolute', top: 120, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
