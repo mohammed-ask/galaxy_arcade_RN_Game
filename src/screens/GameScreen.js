@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dimensions, StyleSheet, StatusBar, Text, View, Alert, ImageBackground, Modal, TouchableOpacity, BackHandler } from 'react-native';
+import { Dimensions, StyleSheet, StatusBar, Text, View, Alert, ImageBackground, Modal, TouchableOpacity, BackHandler, Image } from 'react-native';
 import Matter from 'matter-js';
 import { GameEngine } from 'react-native-game-engine';
 import Asteroid from '../assets/Ufo.js';
@@ -9,6 +9,8 @@ import Boom from '../assets/Boom.js';
 import Coin from '../assets/Coin.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TouchableScale from 'react-native-touchable-scale';
+import Sound from 'react-native-sound';
+import Life from '../assets/Life.js';
 
 const { width, height } = Dimensions.get('screen');
 const shipSize = 50;
@@ -26,12 +28,62 @@ export default function GameScreen({ navigation }) {
   const gameEngine = useRef(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
+  const [showBlinkingHeart, setShowBlinkingHeart] = useState(false);
+  const lastLaserSoundTime = useRef(0); // Track the last time the laser sound was played
+  const soundRefs = useRef({
+    laser: null,
+    pop: null,
+    coin: null,
+    gameOver: null,
+    lifeLost: null,
+  });
+
+  function getRandomNumber() {
+    return Math.floor(Math.random() * 8) + 1;
+  }
+
+  const asteroidImages = {
+    1: require('../assets/imgaes/asteroid1.png'),
+    2: require('../assets/imgaes/asteroid2.png'),
+    3: require('../assets/imgaes/asteroid3.png'),
+    4: require('../assets/imgaes/asteroid4.png'),
+    5: require('../assets/imgaes/asteroid5.png'),
+    6: require('../assets/imgaes/asteroid6.png'),
+    7: require('../assets/imgaes/asteroid7.png'),
+    8: require('../assets/imgaes/asteroid8.png'),
+  };
+
+
+  const playLaserSound = async () => {
+    const currentTime = Date.now(); // Get the current time
+    if (currentTime - lastLaserSoundTime.current < 10000) {
+      // If less than 200ms have passed, skip playing the sound
+      return;
+    }
+
+    // Update the last played time
+    lastLaserSoundTime.current = currentTime;
+
+    if (soundRefs.current.laser) {
+      soundRefs.current.laser.stop(); // Stop any previous instance
+      soundRefs.current.laser.setCurrentTime(0); // Stop any previous instance
+      soundRefs.current.laser.play((success) => {
+        if (!success) {
+          console.log('Failed to play laser sound');
+        }
+      });
+    }
+  };
 
   // Game state variables
   const livesRef = useRef(3);
   const scoreRef = useRef(0);
   const coinsRef = useRef(0); // Track collected coins
-  const engineRef = useRef(Matter.Engine.create({ enableSleeping: false }));
+  const engineRef = useRef(Matter.Engine.create({
+    enableSleeping: false,
+    positionIterations: 6, // Increase for better collision accuracy
+    velocityIterations: 4,
+  }));
   const worldRef = useRef(engineRef.current.world);
   const shipRef = useRef(Matter.Bodies.rectangle(width / 2, height - shipSize * 2, shipSize, shipSize, { isStatic: true }));
 
@@ -84,11 +136,81 @@ export default function GameScreen({ navigation }) {
     // Clear the Matter.js world and reinitialize
     Matter.Engine.clear(engineRef.current);
     Matter.World.clear(worldRef.current, false);
-    engineRef.current = Matter.Engine.create({ enableSleeping: false });
+    engineRef.current = Matter.Engine.create({
+      enableSleeping: false,
+      positionIterations: 6, // Increase for better collision accuracy
+      velocityIterations: 4,
+    });
     worldRef.current = engineRef.current.world;
     shipRef.current = Matter.Bodies.rectangle(width / 2, height - shipSize * 2, shipSize, shipSize, { isStatic: true });
+    soundRefs.current.laser.play();
     initializeWorld();
   };
+
+  useEffect(() => {
+    if (showBlinkingHeart) {
+      setInterval(() => {
+        setShowBlinkingHeart(false)
+      }, 600);
+    }
+  }, [showBlinkingHeart])
+
+  useEffect(() => {
+    // Initialize sound effects
+    soundRefs.current.laser = new Sound('laserlong.wav', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Failed to load laser sound', error);
+      } else {
+        // Preload the sound
+        soundRefs.current.laser.setVolume(0.05);
+      }
+    });
+
+    soundRefs.current.pop = new Sound('pop.wav', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Failed to load pop sound', error);
+      } else {
+        // Preload the sound
+        soundRefs.current.pop.setVolume(0.05);
+      }
+    });
+
+    soundRefs.current.coin = new Sound('coin.wav', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Failed to load coin sound', error);
+      } else {
+        // Preload the sound
+        soundRefs.current.coin.setVolume(1.0);
+      }
+    });
+
+    soundRefs.current.gameOver = new Sound('gameover.wav', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Failed to load gameOver sound', error);
+      } else {
+        // Preload the sound
+        soundRefs.current.gameOver.setVolume(0.2);
+      }
+    });
+
+    soundRefs.current.lifeLost = new Sound('lifelost.wav', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Failed to load lifeLost sound', error);
+      } else {
+        // Preload the sound
+        soundRefs.current.lifeLost.setVolume(0.2);
+      }
+    });
+
+    // Cleanup sounds when the component unmounts
+    return () => {
+      Object.values(soundRefs.current).forEach(sound => {
+        if (sound) {
+          sound.release();
+        }
+      });
+    };
+  }, []);
 
   // Reset game when the component mounts
   useEffect(() => {
@@ -120,6 +242,7 @@ export default function GameScreen({ navigation }) {
     if (livesRef.current <= 0 && !gameOver) {
       updateBestScore(scoreRef.current)
       setTimeout(() => {
+        soundRefs.current.laser.stop();
         setGameOver(true);
       }, 300);
       setModalVisible(true)
@@ -130,6 +253,7 @@ export default function GameScreen({ navigation }) {
   //Pause Game
   const pauseGame = () => {
     setGamePause(true)
+    soundRefs.current.laser.stop();
   }
 
   // Stop the game
@@ -178,8 +302,11 @@ export default function GameScreen({ navigation }) {
   let bulletCooldown = 0;
   const BulletShooter = (entities, { time }) => {
     bulletCooldown += time.delta;
-    if (bulletCooldown > 300) {
+    if (bulletCooldown > 200) {
       bulletCooldown = 0;
+
+      // Play laser sound (debounced)
+      playLaserSound();
 
       // Fire two bullets together if level up is active
       if (levelUp) {
@@ -286,7 +413,7 @@ export default function GameScreen({ navigation }) {
       Matter.Body.setVelocity(asteroid, { x: 0, y: 5 });
       Matter.World.add(worldRef.current, asteroid);
       const key = isMeteor ? `meteor_${Date.now()}` : `asteroid_${Date.now()}`;
-      entities[key] = { body: asteroid, color, renderer: Asteroid, health: asteroid.health };
+      entities[key] = { body: asteroid, color, renderer: Asteroid, health: asteroid.health, enemyGenerate: asteroidImages[getRandomNumber()] };
     }
 
     // Mega shooting logic
@@ -341,6 +468,17 @@ export default function GameScreen({ navigation }) {
     if (entities[targetKey].health <= 0) {
       Matter.World.remove(worldRef.current, target);
       delete entities[targetKey];
+
+      // Play pop sound immediately
+      if (soundRefs.current.pop) {
+        soundRefs.current.pop.stop(); // Stop any previous instance
+        soundRefs.current.pop.setCurrentTime(0); // Stop any previous instance
+        soundRefs.current.pop.play((success) => {
+          if (!success) {
+            // console.log('Failed to play pop sound');
+          }
+        });
+      }
 
       // Add boom effect at the collision point
       const boom = {
@@ -408,6 +546,17 @@ export default function GameScreen({ navigation }) {
             }
           });
 
+          // Play coin sound immediately
+          if (soundRefs.current.coin) {
+            soundRefs.current.coin.stop(); // Stop any previous instance
+            soundRefs.current.coin.setCurrentTime(0); // Stop any previous instance
+            soundRefs.current.coin.play((success) => {
+              if (!success) {
+                // console.log('Failed to play coin sound');
+              }
+            });
+          }
+
           // Increment coin count
           coinsRef.current += 1;
           setDisplayCoins(coinsRef.current);
@@ -438,6 +587,16 @@ export default function GameScreen({ navigation }) {
           if (mega) {
             livesRef.current = 0;
             setDisplayLives(0);
+            // Play gameOver sound immediately
+            if (soundRefs.current.gameOver) {
+              soundRefs.current.gameOver.stop(); // Stop any previous instance
+              soundRefs.current.gameOver.setCurrentTime(0); // Stop any previous instance
+              soundRefs.current.gameOver.play((success) => {
+                if (!success) {
+                  // console.log('Failed to play gameOver sound');
+                }
+              });
+            }
           } else {
             // Remove asteroid/meteor from Matter.js world and entities
             const target = asteroid || meteor;
@@ -479,6 +638,29 @@ export default function GameScreen({ navigation }) {
             // Decrease lives
             livesRef.current -= 1;
             setDisplayLives(livesRef.current);
+            setShowBlinkingHeart(true)
+            if (livesRef.current) {
+              // Play lifeLost sound immediately
+              if (soundRefs.current.lifeLost) {
+                soundRefs.current.lifeLost.stop(); // Stop any previous instance
+                soundRefs.current.lifeLost.setCurrentTime(0); // Stop any previous instance
+                soundRefs.current.lifeLost.play((success) => {
+                  if (!success) {
+                    // console.log('Failed to play lifeLost sound');
+                  }
+                });
+              }
+            } else {
+              if (soundRefs.current.gameOver) {
+                soundRefs.current.gameOver.stop(); // Stop any previous instance
+                soundRefs.current.gameOver.setCurrentTime(0); // Stop any previous instance
+                soundRefs.current.gameOver.play((success) => {
+                  if (!success) {
+                    // console.log('Failed to play gameOver sound');
+                  }
+                });
+              }
+            }
           }
         }
       });
@@ -513,7 +695,13 @@ export default function GameScreen({ navigation }) {
       >
         <StatusBar hidden={true} />
         <Text style={styles.score}>Score: {displayScore}</Text>
-        <Text style={styles.lives}>Lives: {displayLives}</Text>
+        <View style={{ ...styles.lives, flexDirection: 'row' }}>
+          {/* {displayLives.map(item=>)} */}
+          {Array(displayLives).fill().map((_, i) => <Life isVisible={true} />)}
+          {showBlinkingHeart ?
+            <Life isVisible={false} /> : null}
+        </View>
+        {/* <Text style={styles.lives}>Lives: {displayLives}</Text> */}
         <Text style={styles.coins}>Coins: {displayCoins}</Text>
       </GameEngine>
       {/* Modal for User Name Input */}
@@ -536,7 +724,7 @@ export default function GameScreen({ navigation }) {
           <View style={[styles.modalContent]}>
             <Text style={styles.modalTitle}>GAME PAUSE</Text>
 
-            <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false), setShowPauseModal(false) }}>
+            <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false), setShowPauseModal(false), soundRefs.current.laser.play(); }}>
               <Text style={styles.modalButtonText}>Resume</Text>
             </TouchableScale>
             <TouchableScale onPress={() => navigation.replace('MainMenu')} style={styles.modalButton} >

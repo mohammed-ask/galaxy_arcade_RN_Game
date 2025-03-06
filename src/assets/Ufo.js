@@ -1,16 +1,20 @@
 import React from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
-const Asteroid = ({ body, color, health }) => {
+const Asteroid = ({ body, color, health, enemyGenerate }) => {
+
   return (
     <>
-      {body.label === 'asteroid' ? <Image source={require('../assets/imgaes/asteroid.png')} style={{ ...styles.imgStyle, left: body.position.x - 20, top: body.position.y - 20 }} /> : body.label === 'meteor' ? <Image source={require('../assets/imgaes/meteor.png')} style={{ ...styles.imgStyle, left: body.position.x - 20, top: body.position.y - 20 }} /> : <Image source={require('../assets/imgaes/mega.png')} style={{ ...styles.imgStyle, width: 60, height: 60, left: body.position.x - 20, top: body.position.y - 20 }} />
+      {body.label === 'asteroid' ? <Image
+        source={enemyGenerate}
+        style={{ ...styles.imgStyle, left: body.position.x - 20, top: body.position.y - 20 }}
+      /> : body.label === 'meteor' ? <Image source={enemyGenerate} style={{ ...styles.imgStyle, left: body.position.x - 20, top: body.position.y - 20 }} /> : <Image source={require('../assets/imgaes/mega.png')} style={{ ...styles.imgStyle, width: 60, height: 60, left: body.position.x - 20, top: body.position.y - 20 }} />
       }
       {body.label === 'meteor' && (
         <View
           style={{
             position: 'absolute',
-            left: body.position.x - 20,
+            left: body.position.x - 15,
             top: body.position.y + 30,
             width: 40,
             height: 3,
@@ -59,6 +63,6 @@ const Asteroid = ({ body, color, health }) => {
 export default Asteroid;
 const styles = StyleSheet.create({
   imgStyle: {
-    width: 40, height: 40, position: 'absolute',
+    width: 50, height: 50, position: 'absolute',
   }
 })
