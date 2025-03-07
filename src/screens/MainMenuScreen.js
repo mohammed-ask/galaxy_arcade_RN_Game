@@ -12,7 +12,6 @@ const MainMenuScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [nameValidationError, setNameValidationError] = useState('');
-  const [currentFrame, setCurrentFrame] = useState(0);
 
   useEffect(() => {
     const checkUserDetails = async () => {
@@ -62,7 +61,7 @@ const MainMenuScreen = () => {
             source={require('../assets/imgaes/goldcoin.gif')}
           /> */}
           <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
-          <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>0</Text>
+          <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>{userDetail.Coins}</Text>
         </View>
         <Text style={styles.title}>Hyy, {userDetail.userName}</Text>
         <Text style={styles.score}>Best Score: {userDetail.bestScore}</Text>
@@ -86,7 +85,7 @@ const MainMenuScreen = () => {
               position: 'absolute',
               width: 50,
               height: 50,
-              top: '64%',
+              top: '58%',
               left: '48%',
             }}
           />

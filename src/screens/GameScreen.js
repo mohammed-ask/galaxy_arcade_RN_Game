@@ -37,10 +37,12 @@ export default function GameScreen({ navigation }) {
     gameOver: null,
     lifeLost: null,
   });
-
+  const [enemySpeedMultiplier, setEnemySpeedMultiplier] = useState(0); // Initial speed multiplier
+  const elapsedTimeRef = useRef(0); // Track elapsed time in milliseconds
   function getRandomNumber() {
     return Math.floor(Math.random() * 8) + 1;
   }
+  const [displayTime, setDisplayTime] = useState('00:00'); // Formatted time (MM:SS)
 
   const asteroidImages = {
     1: require('../assets/imgaes/asteroid1.png'),
@@ -67,11 +69,7 @@ export default function GameScreen({ navigation }) {
     if (soundRefs.current.laser) {
       soundRefs.current.laser.stop(); // Stop any previous instance
       soundRefs.current.laser.setCurrentTime(0); // Stop any previous instance
-      soundRefs.current.laser.play((success) => {
-        if (!success) {
-          console.log('Failed to play laser sound');
-        }
-      });
+      soundRefs.current.laser.play();
     }
   };
 
@@ -88,12 +86,15 @@ export default function GameScreen({ navigation }) {
   const shipRef = useRef(Matter.Bodies.rectangle(width / 2, height - shipSize * 2, shipSize, shipSize, { isStatic: true }));
 
   //Update Best Score
-  const updateBestScore = async (currentScore) => {
+  const updateBestScore = async (currentScore, coins) => {
     const bestScore = await AsyncStorage.getItem('bestScore');
+    const coinsOld = await AsyncStorage.getItem('Coins');
     if (!bestScore || currentScore > parseInt(bestScore)) {
       await AsyncStorage.setItem('bestScore', currentScore.toString());
-      setUserDetail((prev) => ({ ...prev, bestScore: currentScore.toString() }));
+      // setUserDetail((prev) => ({ ...prev, bestScore: currentScore.toString() }));
     }
+    const totalCoins = Number(coinsOld) + Number(coins)
+    await AsyncStorage.setItem('Coins', totalCoins.toString());
   };
 
   // Initialize Matter.js world
@@ -132,6 +133,11 @@ export default function GameScreen({ navigation }) {
     setLevelUp(false);
     setLevel3(false);
     setMegaSpawned(false);
+
+    // Reset timer and speed multiplier
+    elapsedTimeRef.current = 0;
+    setEnemySpeedMultiplier(0);
+    setDisplayTime('00:00');
 
     // Clear the Matter.js world and reinitialize
     Matter.Engine.clear(engineRef.current);
@@ -184,7 +190,7 @@ export default function GameScreen({ navigation }) {
       }
     });
 
-    soundRefs.current.gameOver = new Sound('gameover.wav', Sound.MAIN_BUNDLE, (error) => {
+    soundRefs.current.gameOver = new Sound('game_over.mp3', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
         console.log('Failed to load gameOver sound', error);
       } else {
@@ -198,7 +204,7 @@ export default function GameScreen({ navigation }) {
         console.log('Failed to load lifeLost sound', error);
       } else {
         // Preload the sound
-        soundRefs.current.lifeLost.setVolume(0.2);
+        soundRefs.current.lifeLost.setVolume(0.1);
       }
     });
 
@@ -240,7 +246,7 @@ export default function GameScreen({ navigation }) {
   // Check for game over
   useEffect(() => {
     if (livesRef.current <= 0 && !gameOver) {
-      updateBestScore(scoreRef.current)
+      updateBestScore(scoreRef.current, coinsRef.current)
       setTimeout(() => {
         soundRefs.current.laser.stop();
         setGameOver(true);
@@ -253,6 +259,7 @@ export default function GameScreen({ navigation }) {
   //Pause Game
   const pauseGame = () => {
     setGamePause(true)
+    updateBestScore(scoreRef.current, coinsRef.current)
     soundRefs.current.laser.stop();
   }
 
@@ -271,6 +278,26 @@ export default function GameScreen({ navigation }) {
     return entities;
   };
 
+  const TimerSystem = (entities, { time }) => {
+    // const frameRate = Math.round(1000 / time.delta); // Calculate FPS
+
+    // console.log(`Current frame rate: ${frameRate} FPS`);
+    elapsedTimeRef.current += time.delta; // Add the time delta to the elapsed time
+
+    // Update the displayed time
+    // const totalSeconds = Math.floor(elapsedTimeRef.current / 1000);
+    // const minutes = Math.floor(totalSeconds / 60);
+    // const seconds = totalSeconds % 60;
+    // setDisplayTime(`${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+
+    // Check if 30 seconds have passed
+    if (elapsedTimeRef.current >= 30000) {
+      elapsedTimeRef.current = 0; // Reset the timer
+      setEnemySpeedMultiplier((prev) => prev + 0.02); // Increase speed by 20%
+    }
+
+    return entities;
+  };
   // Ship Movement
   const MoveShip = (entities, { touches }) => {
     touches.forEach(t => {
@@ -340,10 +367,11 @@ export default function GameScreen({ navigation }) {
 
   // Create an asteroid or meteor
   const createAsteroid = (x, y, isMeteor = false, isMega = false) => {
+    // console.log(0.15 - Number(enemySpeedMultiplier))
     return Matter.Bodies.circle(x, y, 40, {
       label: isMega ? 'mega' : isMeteor ? 'meteor' : 'asteroid',
       restitution: 0.5,
-      frictionAir: isMega ? 0.6 : isMeteor ? 0.15 : 0.1,
+      frictionAir: isMega ? 0.6 : isMeteor ? 0.15 - Number(enemySpeedMultiplier) : 0.1 - Number(enemySpeedMultiplier),
       health: isMega ? 15 : isMeteor ? 4 : 1,
     });
   };
@@ -354,7 +382,7 @@ export default function GameScreen({ navigation }) {
       const asteroid = createAsteroid(x, y);
       Matter.Body.setVelocity(asteroid, { x: (Math.random() - 0.5) * 2, y: 5 });
       Matter.World.add(worldRef.current, asteroid);
-      entities[`asteroid_${Date.now()}_${i}`] = { body: asteroid, color: colors[Math.floor(Math.random() * colors.length)], renderer: Asteroid, health: 1 };
+      entities[`asteroid_${Date.now()}_${i}`] = { body: asteroid, color: colors[Math.floor(Math.random() * colors.length)], renderer: Asteroid, health: 1, enemyGenerate: asteroidImages[getRandomNumber()] };
     }
   };
 
@@ -396,7 +424,7 @@ export default function GameScreen({ navigation }) {
 
     // Spawn mega only once when level 3 is active
     if (level3 && !megaSpawned) {
-      const x = Math.random() * width;
+      const x = Math.random() * (width - 80) + 40;
       const mega = createAsteroid(x, 0, false, true);
       Matter.Body.setVelocity(mega, { x: (Math.random() - 0.5) * 2, y: 2 }); // Random X movement, slow Y movement
       Matter.World.add(worldRef.current, mega);
@@ -407,7 +435,7 @@ export default function GameScreen({ navigation }) {
 
 
     if (Math.random() < 0.015) {
-      const x = Math.random() * width;
+      const x = Math.random() * (width - 80) + 40;
       const color = colors[Math.floor(Math.random() * colors.length)];
       const asteroid = createAsteroid(x, 0, isMeteor);
       Matter.Body.setVelocity(asteroid, { x: 0, y: 5 });
@@ -429,19 +457,46 @@ export default function GameScreen({ navigation }) {
 
   // Coin Spawner
   const CoinSpawner = (entities) => {
-    if (Math.random() < 0.002) { // Adjust spawn rate as needed
-      const x = Math.random() * width; // Random X position
-      const y = 0; // Start at the top of the screen
-      const spacing = 50; // Vertical spacing between coins
-      const numCoins = 5; // Number of coins in a vertical line
+    if (Math.random() < 0.002) {
+      const pattern = Math.floor(Math.random() * 3); // Randomly select a pattern (0, 1, or 2)
+      const numCoins = 5; // Number of coins in a pattern
+      const spacing = 50; // Spacing between coins
+
+      let x, y, dx, dy;
+
+      switch (pattern) {
+        case 0: // Straight vertical
+          x = Math.random() * (width - 20) + 10; // Random X position within screen bounds
+          y = 0; // Start at the top of the screen
+          dx = 0; // No horizontal movement
+          dy = spacing; // Vertical spacing
+          break;
+
+        case 1: // Diagonal left to right
+          x = Math.random() * (width - 20 * numCoins) + 10; // Random X position within screen bounds
+          y = 0; // Start at the top of the screen
+          dx = spacing; // Move right
+          dy = spacing; // Move down
+          break;
+
+        case 2: // Diagonal right to left
+          x = Math.random() * (width - 20 * numCoins) + 10 + 20 * numCoins; // Random X position within screen bounds
+          y = 0; // Start at the top of the screen
+          dx = -spacing; // Move left
+          dy = spacing; // Move down
+          break;
+
+        default:
+          break;
+      }
 
       for (let i = 0; i < numCoins; i++) {
-        const coin = Matter.Bodies.circle(x, y + i * spacing, 10, {
+        const coin = Matter.Bodies.circle(x + i * dx, y + i * dy, 10, {
           label: 'coin',
           isSensor: true,
           restitution: 1,
           frictionAir: 0.1,
-          friction: 0.1
+          friction: 0.1,
         });
         Matter.Body.setVelocity(coin, { x: 0, y: 1 }); // Move coins downward
         Matter.World.add(worldRef.current, coin);
@@ -473,11 +528,7 @@ export default function GameScreen({ navigation }) {
       if (soundRefs.current.pop) {
         soundRefs.current.pop.stop(); // Stop any previous instance
         soundRefs.current.pop.setCurrentTime(0); // Stop any previous instance
-        soundRefs.current.pop.play((success) => {
-          if (!success) {
-            // console.log('Failed to play pop sound');
-          }
-        });
+        soundRefs.current.pop.play();
       }
 
       // Add boom effect at the collision point
@@ -550,11 +601,7 @@ export default function GameScreen({ navigation }) {
           if (soundRefs.current.coin) {
             soundRefs.current.coin.stop(); // Stop any previous instance
             soundRefs.current.coin.setCurrentTime(0); // Stop any previous instance
-            soundRefs.current.coin.play((success) => {
-              if (!success) {
-                // console.log('Failed to play coin sound');
-              }
-            });
+            soundRefs.current.coin.play();
           }
 
           // Increment coin count
@@ -577,6 +624,20 @@ export default function GameScreen({ navigation }) {
           // Decrease lives
           livesRef.current -= 1;
           setDisplayLives(livesRef.current);
+          if (livesRef.current) {
+            // Play lifeLost sound immediately
+            if (soundRefs.current.lifeLost) {
+              soundRefs.current.lifeLost.stop(); // Stop any previous instance
+              soundRefs.current.lifeLost.setCurrentTime(0); // Stop any previous instance
+              soundRefs.current.lifeLost.play();
+            }
+          } else {
+            if (soundRefs.current.gameOver) {
+              soundRefs.current.gameOver.stop(); // Stop any previous instance
+              soundRefs.current.gameOver.setCurrentTime(0); // Stop any previous instance
+              soundRefs.current.gameOver.play();
+            }
+          }
         }
 
         if (bodies.includes(shipRef.current) && (asteroid || meteor || mega) && !pair.isProcessed) {
@@ -591,11 +652,7 @@ export default function GameScreen({ navigation }) {
             if (soundRefs.current.gameOver) {
               soundRefs.current.gameOver.stop(); // Stop any previous instance
               soundRefs.current.gameOver.setCurrentTime(0); // Stop any previous instance
-              soundRefs.current.gameOver.play((success) => {
-                if (!success) {
-                  // console.log('Failed to play gameOver sound');
-                }
-              });
+              soundRefs.current.gameOver.play();
             }
           } else {
             // Remove asteroid/meteor from Matter.js world and entities
@@ -644,21 +701,13 @@ export default function GameScreen({ navigation }) {
               if (soundRefs.current.lifeLost) {
                 soundRefs.current.lifeLost.stop(); // Stop any previous instance
                 soundRefs.current.lifeLost.setCurrentTime(0); // Stop any previous instance
-                soundRefs.current.lifeLost.play((success) => {
-                  if (!success) {
-                    // console.log('Failed to play lifeLost sound');
-                  }
-                });
+                soundRefs.current.lifeLost.play();
               }
             } else {
               if (soundRefs.current.gameOver) {
                 soundRefs.current.gameOver.stop(); // Stop any previous instance
                 soundRefs.current.gameOver.setCurrentTime(0); // Stop any previous instance
-                soundRefs.current.gameOver.play((success) => {
-                  if (!success) {
-                    // console.log('Failed to play gameOver sound');
-                  }
-                });
+                soundRefs.current.gameOver.play();
               }
             }
           }
@@ -686,7 +735,7 @@ export default function GameScreen({ navigation }) {
       <GameEngine
         ref={gameEngine}
         style={styles.container}
-        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, handleCollisions, CleanupEntities, moveMega]}
+        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, handleCollisions, CleanupEntities, moveMega, TimerSystem]}
         entities={{
           physics: { engine: engineRef.current, world: worldRef.current },
           spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true },
@@ -701,8 +750,12 @@ export default function GameScreen({ navigation }) {
           {showBlinkingHeart ?
             <Life isVisible={false} /> : null}
         </View>
-        {/* <Text style={styles.lives}>Lives: {displayLives}</Text> */}
-        <Text style={styles.coins}>Coins: {displayCoins}</Text>
+        {/* <Text style={styles.timer}>Time: {displayTime}</Text> */}
+        <View style={{ marginHorizontal: 15, paddingVertical: 0, borderRadius: 30, borderWidth: 0, borderColor: 'transparent', width: 75, height: 35, backgroundColor: '#6200EE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'absolute', top: 40, right: 0 }}>
+          <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
+          <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>{displayCoins}</Text>
+        </View>
+        {/* <Text style={styles.coins}>Coins: {displayCoins}</Text> */}
       </GameEngine>
       {/* Modal for User Name Input */}
       <Modal animationType="fade" transparent={true} visible={modalVisible}>
@@ -740,9 +793,9 @@ export default function GameScreen({ navigation }) {
 const styles = StyleSheet.create({
   containerImg: { flex: 1, zIndex: 2 },
   container: { flex: 1 },
-  score: { position: 'absolute', top: 40, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
+  score: { position: 'absolute', top: 40, left: 20, color: 'white', fontSize: 24, fontFamily: 'Audiowide-Regular' },
   lives: { position: 'absolute', top: 80, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
-  coins: { position: 'absolute', top: 120, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
+  // coins: { position: 'absolute', top: 40, right: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -781,5 +834,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontFamily: 'Audiowide-Regular',
+  },
+  coin: {
+    width: 20, // Adjust based on image size
+    height: 20,
+  },
+  timer: {
+    position: 'absolute',
+    top: 160, // Adjust position as needed
+    left: 20,
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
 });
