@@ -11,12 +11,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import TouchableScale from 'react-native-touchable-scale';
 import Sound from 'react-native-sound';
 import Life from '../assets/Life.js';
+import Bomb from '../assets/Bomb.js';
+import Explosion from '../assets/Explosion.js';
 
 const { width, height } = Dimensions.get('screen');
 const shipSize = 50;
 const colors = ['red', 'blue', 'orange'];
 
 export default function GameScreen({ navigation }) {
+  const entitiesRef = useRef({});
   const [displayScore, setDisplayScore] = useState(0);
   const [displayLives, setDisplayLives] = useState(3);
   const [displayCoins, setDisplayCoins] = useState(0); // Coin counter
@@ -36,6 +39,8 @@ export default function GameScreen({ navigation }) {
     coin: null,
     gameOver: null,
     lifeLost: null,
+    explosion: null,
+    powercollection: null,
   });
   const [enemySpeedMultiplier, setEnemySpeedMultiplier] = useState(0); // Initial speed multiplier
   const elapsedTimeRef = useRef(0); // Track elapsed time in milliseconds
@@ -43,6 +48,8 @@ export default function GameScreen({ navigation }) {
     return Math.floor(Math.random() * 8) + 1;
   }
   const [displayTime, setDisplayTime] = useState('00:00'); // Formatted time (MM:SS)
+  // Add Mega Bomb state
+  const [megaBombCount, setMegaBombCount] = useState(0);
 
   const asteroidImages = {
     1: require('../assets/imgaes/asteroid1.png'),
@@ -181,6 +188,24 @@ export default function GameScreen({ navigation }) {
       }
     });
 
+    soundRefs.current.explosion = new Sound('explosion.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Failed to load explosion sound', error);
+      } else {
+        // Preload the sound
+        soundRefs.current.explosion.setVolume(0.5);
+      }
+    });
+
+    soundRefs.current.powercollection = new Sound('powercollection.wav', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.log('Failed to load powercollection sound', error);
+      } else {
+        // Preload the sound
+        soundRefs.current.powercollection.setVolume(0.2);
+      }
+    });
+
     soundRefs.current.coin = new Sound('coin.wav', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
         console.log('Failed to load coin sound', error);
@@ -275,6 +300,7 @@ export default function GameScreen({ navigation }) {
   // Physics system
   const Physics = (entities, { time }) => {
     Matter.Engine.update(engineRef.current, time.delta);
+    entitiesRef.current = entities; // Update the ref
     return entities;
   };
 
@@ -311,6 +337,69 @@ export default function GameScreen({ navigation }) {
     const shipEntity = entities.spaceship;
     if (shipEntity && shipRef.current) {
       shipEntity.body = shipRef.current;
+    }
+    return entities;
+  };
+
+  // Use Mega Bomb
+  const useMegaBomb = () => {
+    if (megaBombCount > 0) {
+      setMegaBombCount((prev) => prev - 1); // Decrement Mega Bomb count
+
+      // Access entities from the ref
+      const entities = entitiesRef.current;
+
+      // Destroy all enemies on the screen
+      Object.keys(entities).forEach(key => {
+        const entity = entities[key];
+        if (entity.body && (entity.body.label === 'asteroid' || entity.body.label === 'meteor' || entity.body.label === 'mega')) {
+          Matter.World.remove(worldRef.current, entity.body);
+          delete entities[key];
+        }
+      });
+
+      // Add explosion at the center of the screen
+      const explosion = {
+        body: Matter.Bodies.circle(width / 9, height / 3, 100, {
+          isStatic: true,
+          isSensor: true,
+        }),
+        renderer: Explosion, // Use a custom explosion renderer
+        timeout: setTimeout(() => {
+          Matter.World.remove(worldRef.current, explosion.body);
+          delete entities[`explosion_${explosion.body.id}`];
+        }, 2000), // Remove explosion after 300ms
+      };
+      Matter.World.add(worldRef.current, explosion.body);
+      entities[`explosion_${explosion.body.id}`] = explosion;
+
+      // Play explosion sound
+      if (soundRefs.current.explosion) {
+        soundRefs.current.explosion.stop();
+        soundRefs.current.explosion.setCurrentTime(0);
+        soundRefs.current.explosion.play();
+      }
+    }
+  };
+
+  // Create Mega Bomb entity
+  const createMegaBomb = (x, y) => {
+    return Matter.Bodies.circle(x, y, 20, {
+      label: 'megaBomb',
+      isSensor: true,
+      frictionAir: 0.1,
+      renderer: Bomb, // Use a custom renderer
+    });
+  };
+
+  // Spawn Mega Bomb
+  const MegaBombSpawner = (entities) => {
+    if (Math.random() < 0.001) { // Adjust spawn rate as needed
+      const x = Math.random() * (width - 40) + 20;
+      const y = 0;
+      const megaBomb = createMegaBomb(x, y);
+      Matter.World.add(worldRef.current, megaBomb);
+      entities[`megaBomb_${Date.now()}`] = { body: megaBomb, renderer: Bomb };
     }
     return entities;
   };
@@ -388,7 +477,7 @@ export default function GameScreen({ navigation }) {
 
   // Mega enemy shooting bullets
   const megaShoot = (mega, entities) => {
-    const bullet = createBullet(mega.position.x, mega.position.y + 30, true);
+    const bullet = createBullet(mega.position.x + 15, mega.position.y + 30, true);
     Matter.Body.setVelocity(bullet, { x: 0, y: 3 }); // Bullet speed
     Matter.World.add(worldRef.current, bullet);
     entities[`enemyBullet_${Date.now()}`] = { body: bullet, color: 'red', renderer: Bullet };
@@ -571,6 +660,7 @@ export default function GameScreen({ navigation }) {
         const mega = bodies.find(b => b.label === 'mega');
         const coin = bodies.find(b => b.label === 'coin');
         const shipBody = bodies.find(b => b === shipRef.current);
+        const megaBomb = bodies.find(b => b.label === 'megaBomb');
 
         // Handle bullet-asteroid collision
         if (bullet && (asteroid || meteor || mega) && !pair.isProcessed) {
@@ -607,6 +697,25 @@ export default function GameScreen({ navigation }) {
           // Increment coin count
           coinsRef.current += 1;
           setDisplayCoins(coinsRef.current);
+        }
+
+        if (shipBody && megaBomb && !pair.isProcessed) {
+          pair.isProcessed = true;
+
+          Matter.World.remove(worldRef.current, megaBomb);
+          Object.keys(entities).forEach(key => {
+            if (entities[key].body === megaBomb) {
+              delete entities[key];
+            }
+          });
+
+          // Play powercollection sound
+          if (soundRefs.current.powercollection) {
+            soundRefs.current.powercollection.stop();
+            soundRefs.current.powercollection.setCurrentTime(0);
+            soundRefs.current.powercollection.play();
+          }
+          setMegaBombCount((prev) => prev + 1);
         }
 
         if (enemyBullet && bodies.includes(shipRef.current) && !pair.isProcessed) {
@@ -735,7 +844,7 @@ export default function GameScreen({ navigation }) {
       <GameEngine
         ref={gameEngine}
         style={styles.container}
-        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, handleCollisions, CleanupEntities, moveMega, TimerSystem]}
+        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, MegaBombSpawner, handleCollisions, CleanupEntities, moveMega, TimerSystem]}
         entities={{
           physics: { engine: engineRef.current, world: worldRef.current },
           spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true },
@@ -755,7 +864,11 @@ export default function GameScreen({ navigation }) {
           <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
           <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>{displayCoins}</Text>
         </View>
-        {/* <Text style={styles.coins}>Coins: {displayCoins}</Text> */}
+        <TouchableOpacity onPress={() => useMegaBomb()} style={styles.megaBombContainer}>
+          <Image source={require('../assets/imgaes/bomb.gif')} style={styles.megaBombIcon} />
+          <Text style={styles.megaBombCount}>{megaBombCount}</Text>
+        </TouchableOpacity>
+        {/* <Image source={require('../assets/imgaes/explosion.gif')} style={{ position: 'absolute', left: width / 9, top: height / 3, height: 300, width: 300 }} /> */}
       </GameEngine>
       {/* Modal for User Name Input */}
       <Modal animationType="fade" transparent={true} visible={modalVisible}>
@@ -846,5 +959,22 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  megaBombContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  megaBombIcon: {
+    width: 50,
+    height: 50,
+  },
+  megaBombCount: {
+    color: 'white',
+    fontSize: 18,
+    marginLeft: -10,
+    fontFamily: 'Audiowide-Regular',
   },
 });
