@@ -22,7 +22,10 @@ function Spaceship({ body, isVisible }) {
   }, [isVisible]);
 
   return (
-    <Image source={require('../assets/imgaes/spaceship.png')} style={{ position: 'absolute', left: body.position.x - 50 / 2, top: body.position.y - 50 / 2, height: 50, width: 50, opacity: isVisible ? 1 : blinking }} />
+    <>
+      <Image source={require('../assets/imgaes/spaceship.png')} style={{ position: 'absolute', left: body.position.x - 50 / 2, top: body.position.y - 50 / 2, height: 50, width: 50, opacity: isVisible ? 1 : blinking }} />
+      {/* <Image source={require("../assets/imgaes/shipshield.gif")} style={{ width: 100, height: 100, position: 'absolute', left: body.position.x - 50, top: body.position.y - 50 }} resizeMode='contain' /> */}
+    </>
   )
 }
 

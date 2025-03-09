@@ -13,6 +13,9 @@ import Sound from 'react-native-sound';
 import Life from '../assets/Life.js';
 import Bomb from '../assets/Bomb.js';
 import Explosion from '../assets/Explosion.js';
+import Star from '../assets/Star.js';
+import TimerBar from '../components/TimerBar.js';
+import styles from './GameStyle.js';
 
 const { width, height } = Dimensions.get('screen');
 const shipSize = 50;
@@ -41,6 +44,7 @@ export default function GameScreen({ navigation }) {
     lifeLost: null,
     explosion: null,
     powercollection: null,
+    bossPop: null,
   });
   const [enemySpeedMultiplier, setEnemySpeedMultiplier] = useState(0); // Initial speed multiplier
   const elapsedTimeRef = useRef(0); // Track elapsed time in milliseconds
@@ -50,6 +54,11 @@ export default function GameScreen({ navigation }) {
   const [displayTime, setDisplayTime] = useState('00:00'); // Formatted time (MM:SS)
   // Add Mega Bomb state
   const [megaBombCount, setMegaBombCount] = useState(0);
+  const [isMultiplierActive, setIsMultiplierActive] = useState(false); // Track if multiplier is active
+  const [multiplierDuration, setMultiplierDuration] = useState(0); // Track remaining duration
+  const [multiplierProgress, setMultiplierProgress] = useState(0); // Track progress for the duration bar
+  const isMultiplierActiveRef = useRef(false);
+  const isPowerUpActive = useRef(false);
 
   const asteroidImages = {
     1: require('../assets/imgaes/asteroid1.png'),
@@ -170,27 +179,32 @@ export default function GameScreen({ navigation }) {
 
   useEffect(() => {
     // Initialize sound effects
-    soundRefs.current.laser = new Sound('laserlong.wav', Sound.MAIN_BUNDLE, (error) => {
+    soundRefs.current.laser = new Sound('laser.wav', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
-        console.log('Failed to load laser sound', error);
       } else {
         // Preload the sound
-        soundRefs.current.laser.setVolume(0.05);
+        soundRefs.current.laser.setVolume(0.02);
       }
     });
 
-    soundRefs.current.pop = new Sound('pop.wav', Sound.MAIN_BUNDLE, (error) => {
+    soundRefs.current.pop = new Sound('kill.mp3', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
-        console.log('Failed to load pop sound', error);
       } else {
         // Preload the sound
         soundRefs.current.pop.setVolume(0.05);
       }
     });
 
+    soundRefs.current.bossPop = new Sound('enemybosskill.mp3', Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+      } else {
+        // Preload the sound
+        soundRefs.current.bossPop.setVolume(0.1);
+      }
+    });
+
     soundRefs.current.explosion = new Sound('explosion.mp3', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
-        console.log('Failed to load explosion sound', error);
       } else {
         // Preload the sound
         soundRefs.current.explosion.setVolume(0.5);
@@ -199,7 +213,6 @@ export default function GameScreen({ navigation }) {
 
     soundRefs.current.powercollection = new Sound('powercollection.wav', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
-        console.log('Failed to load powercollection sound', error);
       } else {
         // Preload the sound
         soundRefs.current.powercollection.setVolume(0.2);
@@ -208,7 +221,6 @@ export default function GameScreen({ navigation }) {
 
     soundRefs.current.coin = new Sound('coin.wav', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
-        console.log('Failed to load coin sound', error);
       } else {
         // Preload the sound
         soundRefs.current.coin.setVolume(1.0);
@@ -217,7 +229,6 @@ export default function GameScreen({ navigation }) {
 
     soundRefs.current.gameOver = new Sound('game_over.mp3', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
-        console.log('Failed to load gameOver sound', error);
       } else {
         // Preload the sound
         soundRefs.current.gameOver.setVolume(0.2);
@@ -226,7 +237,6 @@ export default function GameScreen({ navigation }) {
 
     soundRefs.current.lifeLost = new Sound('lifelost.wav', Sound.MAIN_BUNDLE, (error) => {
       if (error) {
-        console.log('Failed to load lifeLost sound', error);
       } else {
         // Preload the sound
         soundRefs.current.lifeLost.setVolume(0.1);
@@ -281,6 +291,20 @@ export default function GameScreen({ navigation }) {
     }
   }, [displayLives, gameOver, navigation]);
 
+  useEffect(() => {
+    if (multiplierDuration > 0) {
+      const interval = setInterval(() => {
+        setMultiplierDuration((prev) => prev - 1); // Decrease duration by 1 second
+        setMultiplierProgress((prev) => prev - 10); // Decrease progress bar by 10%
+      }, 1000); // Update every second
+
+      return () => { clearInterval(interval) }; // Cleanup interval
+    } else if (multiplierDuration === 0) {
+      isMultiplierActiveRef.current = false;
+      // setIsMultiplierActive(false); // Deactivate multiplier when duration ends
+    }
+  }, [multiplierDuration]);
+
   //Pause Game
   const pauseGame = () => {
     setGamePause(true)
@@ -319,11 +343,20 @@ export default function GameScreen({ navigation }) {
     // Check if 30 seconds have passed
     if (elapsedTimeRef.current >= 30000) {
       elapsedTimeRef.current = 0; // Reset the timer
-      setEnemySpeedMultiplier((prev) => prev + 0.02); // Increase speed by 20%
+      if (enemySpeedMultiplier != 0.08) {
+        setEnemySpeedMultiplier((prev) => prev + 0.02); // Increase speed by 20%
+      }
     }
 
     return entities;
   };
+
+  const updateScore = (points) => {
+    const multiplier = isMultiplierActiveRef.current ? 2 : 1; // Apply multiplier if active
+    scoreRef.current += points * multiplier;
+    setDisplayScore(scoreRef.current);
+  };
+
   // Ship Movement
   const MoveShip = (entities, { touches }) => {
     touches.forEach(t => {
@@ -337,6 +370,27 @@ export default function GameScreen({ navigation }) {
     const shipEntity = entities.spaceship;
     if (shipEntity && shipRef.current) {
       shipEntity.body = shipRef.current;
+    }
+    return entities;
+  };
+
+  const createMultiplier = (x, y) => {
+    return Matter.Bodies.circle(x, y, 30, {
+      label: 'multiplier',
+      frictionAir: 0.2,
+      isSensor: true, // Make it a sensor so it doesn't collide physically
+      renderer: Star, // Use a custom renderer for the multiplier (you can create a new one)
+    });
+  };
+
+  const MultiplierSpawner = (entities) => {
+    if (!isPowerUpActive.current && Math.random() < 0.001) { // Adjust spawn rate as needed
+      const x = Math.random() * (width - 40) + 20; // Random X position within screen bounds
+      const y = 0; // Start at the top of the screen
+      const multiplier = createMultiplier(x, y);
+      Matter.World.add(worldRef.current, multiplier);
+      entities[`multiplier_${Date.now()}`] = { body: multiplier, renderer: Star }; // Use a custom renderer
+      isPowerUpActive.current = true
     }
     return entities;
   };
@@ -355,6 +409,15 @@ export default function GameScreen({ navigation }) {
         if (entity.body && (entity.body.label === 'asteroid' || entity.body.label === 'meteor' || entity.body.label === 'mega')) {
           Matter.World.remove(worldRef.current, entity.body);
           delete entities[key];
+
+          // Update the score based on the enemy type
+          if (entity.body.label === 'asteroid') {
+            updateScore(10); // Example: 10 points for an asteroid
+          } else if (entity.body.label === 'meteor') {
+            updateScore(20); // Example: 20 points for a meteor
+          } else if (entity.body.label === 'mega') {
+            updateScore(50); // Example: 50 points for a mega enemy
+          }
         }
       });
 
@@ -387,19 +450,20 @@ export default function GameScreen({ navigation }) {
     return Matter.Bodies.circle(x, y, 20, {
       label: 'megaBomb',
       isSensor: true,
-      frictionAir: 0.1,
+      frictionAir: 0.2,
       renderer: Bomb, // Use a custom renderer
     });
   };
 
   // Spawn Mega Bomb
   const MegaBombSpawner = (entities) => {
-    if (Math.random() < 0.001) { // Adjust spawn rate as needed
+    if (!isPowerUpActive.current && Math.random() < 0.001) { // Adjust spawn rate as needed
       const x = Math.random() * (width - 40) + 20;
       const y = 0;
       const megaBomb = createMegaBomb(x, y);
       Matter.World.add(worldRef.current, megaBomb);
       entities[`megaBomb_${Date.now()}`] = { body: megaBomb, renderer: Bomb };
+      isPowerUpActive.current = true
     }
     return entities;
   };
@@ -456,7 +520,6 @@ export default function GameScreen({ navigation }) {
 
   // Create an asteroid or meteor
   const createAsteroid = (x, y, isMeteor = false, isMega = false) => {
-    // console.log(0.15 - Number(enemySpeedMultiplier))
     return Matter.Bodies.circle(x, y, 40, {
       label: isMega ? 'mega' : isMeteor ? 'meteor' : 'asteroid',
       restitution: 0.5,
@@ -613,11 +676,19 @@ export default function GameScreen({ navigation }) {
       Matter.World.remove(worldRef.current, target);
       delete entities[targetKey];
 
-      // Play pop sound immediately
-      if (soundRefs.current.pop) {
-        soundRefs.current.pop.stop(); // Stop any previous instance
-        soundRefs.current.pop.setCurrentTime(0); // Stop any previous instance
-        soundRefs.current.pop.play();
+      if (target.label === 'asteroid') {
+        // Play pop sound immediately
+        if (soundRefs.current.pop) {
+          soundRefs.current.pop.stop(); // Stop any previous instance
+          soundRefs.current.pop.setCurrentTime(0); // Stop any previous instance
+          soundRefs.current.pop.play();
+        }
+      } else {
+        if (soundRefs.current.bossPop) {
+          soundRefs.current.bossPop.stop(); // Stop any previous instance
+          soundRefs.current.bossPop.setCurrentTime(0); // Stop any previous instance
+          soundRefs.current.bossPop.play();
+        }
       }
 
       // Add boom effect at the collision point
@@ -636,8 +707,14 @@ export default function GameScreen({ navigation }) {
       entities[`boom_${boom.body.id}`] = boom;
 
       // Update score
-      scoreRef.current += 10;
-      setDisplayScore(scoreRef.current);
+      // Update the score based on the enemy type
+      if (target.label === 'asteroid') {
+        updateScore(10); // Example: 10 points for an asteroid
+      } else if (target.label === 'meteor') {
+        updateScore(20); // Example: 20 points for a meteor
+      } else if (target.label === 'mega') {
+        updateScore(50); // Example: 50 points for a mega enemy
+      }
 
       // If mega is destroyed, spawn 10 asteroids
       if (target.label === 'mega') {
@@ -661,6 +738,7 @@ export default function GameScreen({ navigation }) {
         const coin = bodies.find(b => b.label === 'coin');
         const shipBody = bodies.find(b => b === shipRef.current);
         const megaBomb = bodies.find(b => b.label === 'megaBomb');
+        const multiplier = bodies.find(b => b.label === 'multiplier');
 
         // Handle bullet-asteroid collision
         if (bullet && (asteroid || meteor || mega) && !pair.isProcessed) {
@@ -716,6 +794,34 @@ export default function GameScreen({ navigation }) {
             soundRefs.current.powercollection.play();
           }
           setMegaBombCount((prev) => prev + 1);
+          isPowerUpActive.current = false
+        }
+
+        // Handle ship-multiplier collision
+        if (shipBody && multiplier && !pair.isProcessed) {
+          pair.isProcessed = true;
+
+          // Remove multiplier from the world and entities
+          Matter.World.remove(worldRef.current, multiplier);
+          Object.keys(entities).forEach(key => {
+            if (entities[key].body === multiplier) {
+              delete entities[key];
+            }
+          });
+
+          // Play powercollection sound
+          if (soundRefs.current.powercollection) {
+            soundRefs.current.powercollection.stop();
+            soundRefs.current.powercollection.setCurrentTime(0);
+            soundRefs.current.powercollection.play();
+          }
+
+          // Activate the multiplier
+          isMultiplierActiveRef.current = true;
+          // setIsMultiplierActive(true);
+          setMultiplierDuration(10); // Set duration to 10 seconds
+          setMultiplierProgress(100); // Set progress bar to 100%
+          isPowerUpActive.current = false
         }
 
         if (enemyBullet && bodies.includes(shipRef.current) && !pair.isProcessed) {
@@ -834,6 +940,10 @@ export default function GameScreen({ navigation }) {
       if (entity.body && (entity.body.position.y < -50 || entity.body.position.y > height + 50)) {
         Matter.World.remove(worldRef.current, entity.body);
         delete entities[key];
+        // Reset power-up state if a power-up falls off the screen
+        if (entity.body.label === 'megaBomb' || entity.body.label === 'multiplier') {
+          isPowerUpActive.current = false
+        }
       }
     });
     return entities;
@@ -844,7 +954,7 @@ export default function GameScreen({ navigation }) {
       <GameEngine
         ref={gameEngine}
         style={styles.container}
-        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, MegaBombSpawner, handleCollisions, CleanupEntities, moveMega, TimerSystem]}
+        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, MegaBombSpawner, MultiplierSpawner, handleCollisions, CleanupEntities, moveMega, TimerSystem]}
         entities={{
           physics: { engine: engineRef.current, world: worldRef.current },
           spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true },
@@ -852,7 +962,7 @@ export default function GameScreen({ navigation }) {
         running={!gameOver && !gamePause} // Stop the game loop when game is over
       >
         <StatusBar hidden={true} />
-        <Text style={styles.score}>Score: {displayScore}</Text>
+        <Text style={styles.score}>Score: {displayScore}{isMultiplierActiveRef.current ? 'x2' : ''}</Text>
         <View style={{ ...styles.lives, flexDirection: 'row' }}>
           {/* {displayLives.map(item=>)} */}
           {Array(displayLives).fill().map((_, i) => <Life isVisible={true} />)}
@@ -860,7 +970,7 @@ export default function GameScreen({ navigation }) {
             <Life isVisible={false} /> : null}
         </View>
         {/* <Text style={styles.timer}>Time: {displayTime}</Text> */}
-        <View style={{ marginHorizontal: 15, paddingVertical: 0, borderRadius: 30, borderWidth: 0, borderColor: 'transparent', width: 75, height: 35, backgroundColor: '#6200EE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'absolute', top: 40, right: 0 }}>
+        <View style={styles.coinContainer}>
           <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
           <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>{displayCoins}</Text>
         </View>
@@ -868,7 +978,7 @@ export default function GameScreen({ navigation }) {
           <Image source={require('../assets/imgaes/bomb.gif')} style={styles.megaBombIcon} />
           <Text style={styles.megaBombCount}>{megaBombCount}</Text>
         </TouchableOpacity>
-        {/* <Image source={require('../assets/imgaes/explosion.gif')} style={{ position: 'absolute', left: width / 9, top: height / 3, height: 300, width: 300 }} /> */}
+        <TimerBar multiplierProgress={multiplierProgress} isMultiplierActive={isMultiplierActiveRef.current} />
       </GameEngine>
       {/* Modal for User Name Input */}
       <Modal animationType="fade" transparent={true} visible={modalVisible}>
@@ -902,79 +1012,3 @@ export default function GameScreen({ navigation }) {
     </ImageBackground>
   );
 }
-
-const styles = StyleSheet.create({
-  containerImg: { flex: 1, zIndex: 2 },
-  container: { flex: 1 },
-  score: { position: 'absolute', top: 40, left: 20, color: 'white', fontSize: 24, fontFamily: 'Audiowide-Regular' },
-  lives: { position: 'absolute', top: 80, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
-  // coins: { position: 'absolute', top: 40, right: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)'
-  },
-  modalContent: {
-    backgroundColor: '#222',
-    padding: 30,
-    borderRadius: 20,
-    alignItems: 'center',
-    width: '80%',
-    borderWidth: 3,
-    borderColor: '#6200EE',
-    elevation: 10
-  },
-  modalTitle: {
-    fontSize: 20,
-    marginBottom: 20,
-    color: '#FFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 5,
-    fontFamily: 'Audiowide-Regular',
-  },
-  modalButton: {
-    marginTop: 20,
-    backgroundColor: '#6200EE',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    elevation: 5,
-    shadowColor: '#fff'
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Audiowide-Regular',
-  },
-  coin: {
-    width: 20, // Adjust based on image size
-    height: 20,
-  },
-  timer: {
-    position: 'absolute',
-    top: 160, // Adjust position as needed
-    left: 20,
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  megaBombContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  megaBombIcon: {
-    width: 50,
-    height: 50,
-  },
-  megaBombCount: {
-    color: 'white',
-    fontSize: 18,
-    marginLeft: -10,
-    fontFamily: 'Audiowide-Regular',
-  },
-});
