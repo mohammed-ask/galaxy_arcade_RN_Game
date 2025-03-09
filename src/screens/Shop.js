@@ -1,83 +1,213 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ImageBackground, Image, ScrollView, TouchableOpacity } from 'react-native';
+import { Color, spaceShipIcons } from '../utils';
+import { BlurView } from '@react-native-community/blur';
 
-const BlueGlowCircle = () => {
-    // Create an animated value for the glow intensity
-    const glowAnim = useRef(new Animated.Value(0)).current;
+const Shop = () => {
+    const [shipData, setShipData] = useState([])
+    const [userDetail, setUserDetail] = useState({ userName: '', bestScore: '', Coins: '' });
 
-    // Function to animate the glow
-    const animateGlow = () => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(glowAnim, {
-                    toValue: 1, // Maximum glow intensity
-                    duration: 1500, // Slower animation for subtlety
-                    easing: Easing.linear,
-                    useNativeDriver: false, // `shadow` properties are not supported by native driver
-                }),
-                Animated.timing(glowAnim, {
-                    toValue: 0, // Minimum glow intensity
-                    duration: 1500,
-                    easing: Easing.linear,
-                    useNativeDriver: false,
-                }),
-            ])
-        ).start();
-    };
-
-    // Start the animation when the component mounts
     useEffect(() => {
-        animateGlow();
+        const checkUserDetails = async () => {
+            const userName = await AsyncStorage.getItem('userName');
+            const bestScore = await AsyncStorage.getItem('bestScore');
+            const coins = await AsyncStorage.getItem('Coins');
+
+            setUserDetail({
+                userName: userName || '',
+                bestScore: bestScore || '0',
+                Coins: coins || '0'
+            });
+        };
+        checkUserDetails();
+
     }, []);
 
-    // Interpolate the animated value for shadowRadius, shadowOpacity, and backgroundColor
-    const shadowRadius = glowAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [5, 15], // Larger radius for a stronger glow
-    });
+    useEffect(() => {
+        (async () => {
+            const getShips = await AsyncStorage.getItem('Store')
+            setShipData(JSON.parse(getShips))
+            // console.log(getShips, 'gss')
+        })()
+    }, [])
 
-    const shadowOpacity = glowAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.1, 0.4], // Reduced opacity for a more transparent glow
-    });
+    const ShipCard = ({ ship, index }) => {
+        const { name, unlock, cost, active } = ship;
 
-    const backgroundColor = glowAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['rgba(30, 144, 255, 0.3)', 'rgba(30, 144, 255, 0.6)'], // Blue glow (dodger blue)
-    });
+        return (
+            <View style={styles.card}>
+                {/* Image */}
+                <Image source={spaceShipIcons[index].source} style={styles.image} />
+
+                {/* Ship Name */}
+                <Text style={styles.name}>{name}</Text>
+
+                {/* If the ship is locked, show cost and "Buy" button */}
+                {unlock ? (
+                    // If unlocked, show status and select button
+                    <View style={styles.statusContainer}>
+                        <Text style={{ ...styles.statusText, display: active ? 'flex' : 'none' }}>
+                            {active ? 'Active' : ''}
+                        </Text>
+                        {!active && (
+                            <TouchableOpacity style={styles.selectButton}>
+                                <Text style={styles.buttonText}>Select</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                ) : (
+                    // If locked, show the cost and "Buy" button
+                    <View style={styles.statusContainer}>
+                        <Text style={styles.costText}>Cost: {cost} Coins</Text>
+                        <TouchableOpacity style={styles.buyButton}>
+                            <Text style={styles.buttonText}>Buy</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+            </View>
+        );
+    };
 
     return (
-        <View style={styles.container}>
-            <Animated.View
-                style={[
-                    styles.glowCircle,
-                    {
-                        shadowRadius: shadowRadius, // Animated shadow radius
-                        shadowOpacity: shadowOpacity, // Animated shadow opacity
-                        backgroundColor: backgroundColor, // Animated blue background color (glowing effect)
-                    },
-                ]}
-            />
-        </View>
+        <ImageBackground source={require('../assets/imgaes/background2.jpg')} style={styles.background}>
+            <View style={styles.containerInner}>
+                {/* Title */}
+                <Text style={styles.title}>Shop</Text>
+                <View style={styles.coinContainer}>
+                    <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
+                    <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>{userDetail.Coins}</Text>
+                </View>
+                <Text style={{ ...styles.title, fontSize: 16, marginBottom: 0 }}>Space Ships :</Text>
+
+                <ScrollView showsHorizontalScrollIndicator={false} horizontal={true} contentContainerStyle={{
+                    height: 220
+                }}>
+                    {shipData?.Ships?.length > 0 && shipData.Ships.map((item, index) => <ShipCard ship={item} index={index} />)
+                    }
+                </ScrollView>
+            </View>
+        </ImageBackground >
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
+    background: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#000', // Dark background for better glow visibility
     },
-    glowCircle: {
-        width: 100, // Diameter of the circle
-        height: 100, // Diameter of the circle
-        borderRadius: 50, // Half of width/height to make it a circle
-        backgroundColor: 'rgba(30, 144, 255, 0.3)', // Initial transparent blue background
-        shadowColor: '#1E90FF', // Blue glow color (dodger blue)
-        shadowOffset: { width: 0, height: 0 }, // Shadow position
-        elevation: 5, // For Android shadow
+    containerInner: {
+        paddingVertical: 30,
+        flex: 1,
+        width: '100%',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    coinContainer: {
+        marginHorizontal: 15,
+        paddingVertical: 0,
+        borderRadius: 30,
+        borderWidth: 0,
+        borderColor: 'transparent',
+        width: 75,
+        height: 35,
+        backgroundColor: '#6200EE',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'absolute',
+        top: 50,
+        right: 0
+    },
+    coin: {
+        width: 20, // Adjust based on image size
+        height: 20,
+    },
+    title: {
+        fontSize: 36,
+        color: '#FFF',
+        fontFamily: 'Audiowide-Regular', // Use a pixelated font
+        marginBottom: 25,
+        marginLeft: 20,
+        marginTop: 10
+    },
+    text: {
+        fontSize: 20,
+        fontWeight: 'bold',
+    },
+    card: {
+        // width: 200,
+        // height: '100%',
+        backgroundColor: '#1e1e1e',
+        borderRadius: 20,
+        padding: 15,
+        margin: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        // justifyContent: 'space-between',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 5,
+        borderWidth: 2,
+        borderColor: Color.primaryColor
+    },
+    image: {
+        width: 65,
+        height: 65,
+        borderRadius: 10,
+        marginBottom: 10,
+    },
+    name: {
+        color: '#fff',
+        fontSize: 16,
+        // marginBottom: 10,
+        fontFamily: 'Audiowide-Regular'
+    },
+    statusContainer: {
+        width: '100%',
+        alignItems: 'center',
+    },
+    statusText: {
+        color: Color.green,
+        fontSize: 12,
+        // marginBottom: 10,
+        fontFamily: 'Audiowide-Regular',
+        marginTop: 10
+    },
+    costText: {
+        color: Color.white, // Tomato color for cost
+        fontSize: 14,
+        fontWeight: '500',
+        // marginBottom: 10,
+        marginTop: 5,
+        fontFamily: 'Audiowide-Regular'
+    },
+    buttonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+        fontFamily: 'Audiowide-Regular'
+    },
+    buyButton: {
+        marginTop: 10,
+        backgroundColor: Color.primaryColor,
+        paddingVertical: 5,
+        paddingHorizontal: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    selectButton: {
+        marginTop: 10,
+        backgroundColor: Color.primaryColor,
+        paddingVertical: 8,
+        paddingHorizontal: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });
 
-export default BlueGlowCircle;
+export default Shop;
