@@ -68,7 +68,7 @@ const MainMenuScreen = () => {
         <TouchableScale style={styles.button} onPress={() => handleNavigation('Game')}>
           <Text style={styles.buttonText}>Start Game</Text>
         </TouchableScale>
-        <TouchableScale style={styles.button} onPress={() => handleNavigation('Upgrades')}>
+        <TouchableScale style={styles.button} onPress={() => handleNavigation('Shop')}>
           <Text style={styles.buttonText}>Shop</Text>
         </TouchableScale>
         <TouchableScale style={styles.button} onPress={() => handleNavigation('Leaderboard')}>

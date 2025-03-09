@@ -5,6 +5,7 @@ import MainMenuScreen from './src/screens/MainMenuScreen.js';
 import GameScreen from './src/screens/GameScreen.js';
 import SplashScreen from './src/screens/Splash.js';
 import Settings from './src/screens/Setting.js';
+import Shop from './src/screens/Shop.js';
 
 const Stack = createStackNavigator();
 
@@ -14,6 +15,7 @@ const App = () => (
       <Stack.Screen name="Splash" component={SplashScreen} />
       <Stack.Screen name="MainMenu" component={MainMenuScreen} />
       <Stack.Screen name="Game" component={GameScreen} />
+      <Stack.Screen name="Shop" component={Shop} />
       <Stack.Screen name="Settings" component={Settings} />
       {/* Add other screens here */}
     </Stack.Navigator>
