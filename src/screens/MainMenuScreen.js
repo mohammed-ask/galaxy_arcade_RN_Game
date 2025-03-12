@@ -39,9 +39,86 @@ const MainMenuScreen = () => {
       // Alert.alert('Error', 'Please enter a valid name.');
       return;
     }
+    const sound = {
+      soundEffect: true,
+      music: true
+    }
+    const store = {
+      Ships: [
+        {
+          id: 1,
+          name: 'Stellar Voyager',
+          unlock: true,
+          cost: 0,
+          active: true
+        },
+        {
+          id: 2,
+          name: 'Nebula Phantom',
+          unlock: false,
+          cost: 500,
+          active: false
+        },
+        {
+          id: 3,
+          name: 'Cosmic Marauder',
+          unlock: false,
+          cost: 750,
+          active: false
+        },
+        {
+          id: 4,
+          name: 'Quantum Drifter',
+          unlock: false,
+          cost: 1000,
+          active: false
+        },
+        {
+          id: 5,
+          name: 'Galactic Tempest',
+          unlock: false,
+          cost: 1250,
+          active: false
+        },
+        {
+          id: 6,
+          name: 'Void Seeker',
+          unlock: false,
+          cost: 1500,
+          active: false
+        },
+      ],
+      powerUps: [
+        {
+          name: 'shield',
+          level: 1,
+          upgradeCost: 300,
+          maxLevel: 7,
+          duration: 10
+        },
+        {
+          name: 'coinMagnet',
+          level: 1,
+          maxLevel: 7,
+          upgradeCost: 200,
+          duration: 10
+        },
+        {
+          name: 'multiplier',
+          level: 1,
+          maxLevel: 7,
+          upgradeCost: 150,
+          duration: 10
+        },
+      ]
+    }
     await AsyncStorage.setItem('userName', nameInput);
     await AsyncStorage.setItem('bestScore', '0');
     await AsyncStorage.setItem('Coins', '0');
+    // await AsyncStorage.setItem('Setting', JSON.stringify(sound));
+    await AsyncStorage.setItem('soundEnabled', 'true');
+    await AsyncStorage.setItem('musicEnabled', 'true');
+    await AsyncStorage.setItem('Store', JSON.stringify(store));
 
     setUserDetail({ userName: nameInput, bestScore: '0', Coins: '0' });
     setModalVisible(false);
@@ -55,11 +132,6 @@ const MainMenuScreen = () => {
     <ImageBackground source={require('../assets/imgaes/background2.jpg')} style={styles.background}>
       <View style={styles.container}>
         <View style={{ marginHorizontal: 15, paddingVertical: 5, borderRadius: 30, borderWidth: 5, borderColor: '#000', width: 100, backgroundColor: '#6200EE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          {/* <FastImage
-            resizeMode="contain"
-            style={{ width: 70, height: 70 }}
-            source={require('../assets/imgaes/goldcoin.gif')}
-          /> */}
           <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
           <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>{userDetail.Coins}</Text>
         </View>
@@ -106,7 +178,7 @@ const MainMenuScreen = () => {
               onChangeText={setNameInput}
             />
             {nameValidationError ? <Text style={{ color: 'red', fontFamily: 'Audiowide-Regular', fontSize: 8 }}>{nameValidationError}</Text> : null}
-            <TouchableOpacity style={styles.modalButton} onPress={handleSaveName}>
+            <TouchableOpacity style={styles.modalButton} onPress={() => handleSaveName()}>
               <Text style={styles.modalButtonText}>🚀 Launch</Text>
             </TouchableOpacity>
           </View>

@@ -17,6 +17,7 @@ import Star from '../assets/Star.js';
 import TimerBar from '../components/TimerBar.js';
 import styles from './GameStyle.js';
 import Shield from '../assets/Shield.js';
+import CoinMagnet from '../assets/CoinMagnet.js';
 
 const { width, height } = Dimensions.get('screen');
 const shipSize = 50;
@@ -61,6 +62,9 @@ export default function GameScreen({ navigation }) {
   const isShieldActive = useRef(false); // Track if shield is active
   const [shieldDuration, setShieldDuration] = useState(0); // Track remaining duration
   const [shieldProgress, setShieldProgress] = useState(0); // Track progress for the duration bar
+  const [coinMagnetDuration, setCoinMagnetDuration] = useState(0);
+  const [coinMagnetProgress, setCoinMagnetProgress] = useState(0);
+  const isCoinMagnetActive = useRef(false);
   const isPowerUpActive = useRef(false);
 
   const asteroidImages = {
@@ -132,7 +136,7 @@ export default function GameScreen({ navigation }) {
     if (gameEngine.current) {
       gameEngine.current.swap({
         physics: { engine: engineRef.current, world: worldRef.current },
-        spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true, showShield: false },
+        spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true, showShield: false, showMagnet: false },
       });
     }
   };
@@ -321,6 +325,19 @@ export default function GameScreen({ navigation }) {
     }
   }, [shieldDuration]);
 
+  useEffect(() => {
+    if (coinMagnetDuration > 0) {
+      const interval = setInterval(() => {
+        setCoinMagnetDuration((prev) => prev - 1);
+        setCoinMagnetProgress((prev) => prev - 10);
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else if (coinMagnetDuration === 0) {
+      isCoinMagnetActive.current = false;
+    }
+  }, [coinMagnetDuration]);
+
   //Pause Game
   const pauseGame = () => {
     setGamePause(true)
@@ -386,6 +403,49 @@ export default function GameScreen({ navigation }) {
     const shipEntity = entities.spaceship;
     if (shipEntity && shipRef.current) {
       shipEntity.body = shipRef.current;
+    }
+    return entities;
+  };
+
+  const CoinAttractionSystem = (entities, { time }) => {
+    if (isCoinMagnetActive.current) {
+      const shipPosition = shipRef.current.position;
+
+      Object.keys(entities).forEach(key => {
+        const entity = entities[key];
+        if (entity.body && entity.body.label === 'coin') {
+          const coinPosition = entity.body.position;
+          const distance = Matter.Vector.magnitude(Matter.Vector.sub(coinPosition, shipPosition));
+
+          // If the coin is within a certain radius, attract it to the ship
+          if (distance < 200) { // Adjust the radius as needed
+            const direction = Matter.Vector.sub(shipPosition, coinPosition);
+            const force = Matter.Vector.normalise(direction);
+            Matter.Body.setVelocity(entity.body, Matter.Vector.mult(force, 5)); // Adjust speed as needed
+          }
+        }
+      });
+    }
+    return entities;
+  };
+
+  const createCoinMagnet = (x, y) => {
+    return Matter.Bodies.circle(x, y, 20, {
+      label: 'coinMagnet',
+      isSensor: true,
+      frictionAir: 0.2,
+      renderer: CoinMagnet, // You can use a custom renderer for the magnet
+    });
+  };
+
+  const CoinMagnetSpawner = (entities) => {
+    if (!isPowerUpActive.current && Math.random() < 0.001) { // Adjust spawn rate as needed
+      const x = Math.random() * (width - 40) + 20;
+      const y = 0;
+      const coinMagnet = createCoinMagnet(x, y);
+      Matter.World.add(worldRef.current, coinMagnet);
+      entities[`coinMagnet_${Date.now()}`] = { body: coinMagnet, renderer: CoinMagnet }; // Use a custom renderer
+      isPowerUpActive.current = true;
     }
     return entities;
   };
@@ -777,6 +837,7 @@ export default function GameScreen({ navigation }) {
         const megaBomb = bodies.find(b => b.label === 'megaBomb');
         const multiplier = bodies.find(b => b.label === 'multiplier');
         const shield = bodies.find(b => b.label === 'shield');
+        const coinMagnet = bodies.find(b => b.label === 'coinMagnet');
 
         // Handle bullet-asteroid collision
         if (bullet && (asteroid || meteor || mega) && !pair.isProcessed) {
@@ -879,7 +940,6 @@ export default function GameScreen({ navigation }) {
           if (shipEntity && shipRef.current) {
             shipEntity.showShield = true;
           }
-          // setIsBlinking(true);
           setTimeout(() => {
             const shipEntity = entities.spaceship;
             if (shipEntity && shipRef.current) {
@@ -899,6 +959,43 @@ export default function GameScreen({ navigation }) {
           setShieldDuration(10); // Set duration to 10 seconds
           setShieldProgress(100); // Set progress bar to 100%
           isPowerUpActive.current = false; // Reset power-up state
+        }
+
+        if (shipBody && coinMagnet && !pair.isProcessed) {
+          pair.isProcessed = true;
+
+          // Remove coin magnet from the world and entities
+          Matter.World.remove(worldRef.current, coinMagnet);
+          Object.keys(entities).forEach(key => {
+            if (entities[key].body === coinMagnet) {
+              delete entities[key];
+            }
+          });
+          const shipEntity = entities.spaceship;
+
+          //Trigger Show Magnet
+          if (shipEntity && shipRef.current) {
+            shipEntity.showMagnet = true;
+          }
+          setTimeout(() => {
+            const shipEntity = entities.spaceship;
+            if (shipEntity && shipRef.current) {
+              shipEntity.showMagnet = false;
+            }
+          }, 30000); // 500ms blink
+
+          // Play powercollection sound
+          if (soundRefs.current.powercollection) {
+            soundRefs.current.powercollection.stop();
+            soundRefs.current.powercollection.setCurrentTime(0);
+            soundRefs.current.powercollection.play();
+          }
+
+          // Activate the coin magnet
+          isCoinMagnetActive.current = true;
+          setCoinMagnetDuration(10); // Set duration to 10 seconds
+          setCoinMagnetProgress(100); // Set progress bar to 100%
+          isPowerUpActive.current = false;
         }
 
         if (enemyBullet && bodies.includes(shipRef.current) && !pair.isProcessed) {
@@ -1031,7 +1128,7 @@ export default function GameScreen({ navigation }) {
         Matter.World.remove(worldRef.current, entity.body);
         delete entities[key];
         // Reset power-up state if a power-up falls off the screen
-        if (entity.body.label === 'megaBomb' || entity.body.label === 'multiplier' || entity.body.label === 'shield') {
+        if (entity.body.label === 'megaBomb' || entity.body.label === 'multiplier' || entity.body.label === 'shield' || entity.body.label === 'coinMagnet') {
           isPowerUpActive.current = false
         }
       }
@@ -1044,10 +1141,10 @@ export default function GameScreen({ navigation }) {
       <GameEngine
         ref={gameEngine}
         style={styles.container}
-        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, MegaBombSpawner, MultiplierSpawner, ShieldSpawner, handleCollisions, CleanupEntities, moveMega, TimerSystem]}
+        systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, MegaBombSpawner, MultiplierSpawner, ShieldSpawner, CoinMagnetSpawner, CoinAttractionSystem, handleCollisions, CleanupEntities, moveMega, TimerSystem]}
         entities={{
           physics: { engine: engineRef.current, world: worldRef.current },
-          spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true, showShield: false },
+          spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true, showShield: false, showMagnet: false },
         }}
         running={!gameOver && !gamePause} // Stop the game loop when game is over
       >
@@ -1070,6 +1167,7 @@ export default function GameScreen({ navigation }) {
         </TouchableOpacity>
         <TimerBar multiplierProgress={multiplierProgress} isMultiplierActive={isMultiplierActiveRef.current} />
         <TimerBar multiplierProgress={shieldProgress} isMultiplierActive={isShieldActive.current} />
+        <TimerBar multiplierProgress={coinMagnetProgress} isMultiplierActive={isCoinMagnetActive.current} />
       </GameEngine>
       {/* Modal for User Name Input */}
       <Modal animationType="fade" transparent={true} visible={modalVisible}>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Image } from "react-native"
 
-function Spaceship({ body, isVisible, showShield }) {
+function Spaceship({ body, isVisible, showShield, showMagnet }) {
   const [blinking, setBlinking] = useState(0.5)
 
   useEffect(() => {
@@ -23,9 +23,11 @@ function Spaceship({ body, isVisible, showShield }) {
 
   return (
     <>
-      <Image source={require('../assets/imgaes/spaceship.png')} style={{ position: 'absolute', left: body.position.x - 50 / 2, top: body.position.y - 50 / 2, height: 50, width: 50, opacity: isVisible ? 1 : blinking }} />
+      <Image source={require('../assets/imgaes/spaceship.png')} style={{ position: 'absolute', left: body.position.x - 50 / 2, top: body.position.y - 50 / 2, height: 50, width: 50, opacity: isVisible ? 1 : blinking, zIndex: 1 }} />
       {showShield ?
         <Image source={require("../assets/imgaes/shipshield.gif")} style={{ width: 100, height: 100, position: 'absolute', left: body.position.x - 50, top: body.position.y - 50 }} resizeMode='contain' /> : null}
+      {showMagnet ?
+        <Image source={require("../assets/imgaes/magnetism.gif")} style={{ width: 150, height: 150, position: 'absolute', left: body.position.x - 75, top: body.position.y - 75, zIndex: 0 }} resizeMode='contain' /> : null}
     </>
   )
 }

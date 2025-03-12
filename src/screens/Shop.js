@@ -1,12 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ImageBackground, Image, ScrollView, TouchableOpacity } from 'react-native';
-import { Color, spaceShipIcons } from '../utils';
+import { View, Text, StyleSheet, ImageBackground, Image, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { Color, isEmpty, powerUpIcons, spaceShipIcons } from '../utils';
 import { BlurView } from '@react-native-community/blur';
+import TouchableScale from 'react-native-touchable-scale';
 
 const Shop = () => {
     const [shipData, setShipData] = useState([])
+    const [modalVisible, setModalVisible] = useState(false);
+    const [shipId, setShipId] = useState({});
+    const [showCoinAlert, setShowCoinAlert] = useState(false);
     const [userDetail, setUserDetail] = useState({ userName: '', bestScore: '', Coins: '' });
+
+    useEffect(() => {
+        (async () => {
+            // await AsyncStorage.setItem('soundEnabled', 'true');
+            // await AsyncStorage.setItem('musicEnabled', 'true');
+            // AsyncStorage.setItem('Coins', '1500')
+        })()
+    }, [])
 
     useEffect(() => {
         const checkUserDetails = async () => {
@@ -32,11 +44,96 @@ const Shop = () => {
         })()
     }, [])
 
+    const handleBuyShip = () => {
+        try {
+            if (userDetail.Coins > shipId.cost) {
+                setShipData(prevState => ({
+                    ...prevState,
+                    Ships: prevState.Ships.map(ship =>
+                        ship.id === shipId.id ? { ...ship, unlock: true } : ship
+                    )
+                }));
+                const coins = userDetail.Coins
+                const remainingCoin = coins - shipId.cost
+                AsyncStorage.setItem('Coins', remainingCoin.toString())
+                setUserDetail(prev => ({
+                    ...prev,
+                    Coins: remainingCoin
+                }));
+                setModalVisible(false)
+            } else {
+                setShowCoinAlert('You dont have enough coins to buy this Spaceship!')
+            }
+        } catch (e) {
+            console.log(e)
+        }
+    }
+
+    const updateShipActive = (id) => {
+        setShipData(prevState => ({
+            ...prevState,
+            Ships: prevState.Ships.map(ship =>
+                ship.id === id
+                    ? { ...ship, active: true }
+                    : { ...ship, active: false }
+            )
+        }));
+    };
+
+    const upgradePowerUp = (powerUpName, cost) => {
+        try {
+            console.log(cost)
+            if (userDetail.Coins > cost) {
+                setShipData(prevState => ({
+                    ...prevState,
+                    powerUps: prevState.powerUps.map(powerUp => {
+                        if (powerUp.name === powerUpName && powerUp.level < powerUp.maxLevel) {
+                            // Calculate new upgrade cost and duration
+                            const newUpgradeCost = Math.round(powerUp.upgradeCost * 1.15); // Increase cost by 15%
+                            const newDuration = Math.round(powerUp.duration * 1.20); // Increase duration by 20%
+                            const newLevel = powerUp.level + 1; // Increase level
+
+                            return {
+                                ...powerUp,
+                                level: newLevel,
+                                upgradeCost: newUpgradeCost,
+                                duration: newDuration,
+                            };
+                        }
+                        return powerUp;
+                    })
+                }));
+                const coins = userDetail.Coins
+                const remainingCoin = coins - cost
+                AsyncStorage.setItem('Coins', remainingCoin.toString())
+                setUserDetail(prev => ({
+                    ...prev,
+                    Coins: remainingCoin
+                }));
+                console.log('done')
+            } else {
+                setModalVisible(true)
+                setShowCoinAlert('You dont have enough coins to upgrade!')
+            }
+        } catch (e) {
+            console.log(e)
+        }
+    };
+
+    useEffect(() => {
+        (async () => {
+            console.log('setitemuu', JSON.stringify(shipData.Ships))
+            if (!isEmpty(shipData)) {
+                await AsyncStorage.setItem('Store', JSON.stringify(shipData))
+            }
+        })()
+    }, [shipData])
+
     const ShipCard = ({ ship, index }) => {
-        const { name, unlock, cost, active } = ship;
+        const { name, unlock, cost, active, id } = ship;
 
         return (
-            <View style={styles.card}>
+            <ImageBackground blurRadius={1} style={styles.card}>
                 {/* Image */}
                 <Image source={spaceShipIcons[index].source} style={styles.image} />
 
@@ -51,43 +148,108 @@ const Shop = () => {
                             {active ? 'Active' : ''}
                         </Text>
                         {!active && (
-                            <TouchableOpacity style={styles.selectButton}>
+                            <TouchableScale onPress={() => updateShipActive(id)} style={styles.selectButton}>
                                 <Text style={styles.buttonText}>Select</Text>
-                            </TouchableOpacity>
+                            </TouchableScale>
                         )}
                     </View>
                 ) : (
                     // If locked, show the cost and "Buy" button
                     <View style={styles.statusContainer}>
                         <Text style={styles.costText}>Cost: {cost} Coins</Text>
-                        <TouchableOpacity style={styles.buyButton}>
+                        <TouchableScale onPress={() => { setShipId({ id: id, cost: cost }); setModalVisible(true) }} style={styles.buyButton}>
                             <Text style={styles.buttonText}>Buy</Text>
-                        </TouchableOpacity>
+                        </TouchableScale>
                     </View>
                 )}
-            </View>
+            </ImageBackground>
         );
     };
 
+    const PowerUpCard = ({ powerItem, index }) => {
+        const { name, level, upgradeCost, maxLevel } = powerItem;
+
+        return (
+            <View style={styles.powerUpCard}>
+                {/* Left section: Name and Level */}
+                <View style={{ width: '30%' }}>
+                    <Image source={powerUpIcons[index].source} style={styles.powerUpIcon} />
+                </View>
+                <View style={styles.powerUpInfo}>
+                    <Text style={styles.powerUpName}>{name}</Text>
+                    <Text style={styles.powerUpLevel}>Lv: {level}/{maxLevel}</Text>
+                </View>
+
+                {/* Right section: Upgrade Cost and Button */}
+                <View style={styles.powerUpActions}>
+                    <Text style={styles.powerUpCost}>{upgradeCost} Coins</Text>
+                    <TouchableScale
+                        style={styles.upgradeButton}
+                        onPress={() => upgradePowerUp(powerItem.name, upgradeCost)}
+                    >
+                        <Text style={styles.buttonText}>Upgrade</Text>
+                    </TouchableScale>
+                </View>
+            </View>
+        );
+    }
+
     return (
         <ImageBackground source={require('../assets/imgaes/background2.jpg')} style={styles.background}>
-            <View style={styles.containerInner}>
-                {/* Title */}
-                <Text style={styles.title}>Shop</Text>
-                <View style={styles.coinContainer}>
-                    <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
-                    <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>{userDetail.Coins}</Text>
-                </View>
-                <Text style={{ ...styles.title, fontSize: 16, marginBottom: 0 }}>Space Ships :</Text>
+            <BlurView style={{ width: '100%', flex: 1 }} blurType="light" blurAmount={1} overlayColor='rgba(0,0,0,0.1)'>
+                <View style={styles.containerInner}>
+                    {/* Title */}
+                    <Text style={styles.title}>Shop</Text>
+                    <View style={styles.coinContainer}>
+                        <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
+                        <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>{userDetail.Coins}</Text>
+                    </View>
+                    <Text style={{ ...styles.title, fontSize: 16, marginBottom: 0 }}>Space Ships :</Text>
 
-                <ScrollView showsHorizontalScrollIndicator={false} horizontal={true} contentContainerStyle={{
-                    height: 220
-                }}>
-                    {shipData?.Ships?.length > 0 && shipData.Ships.map((item, index) => <ShipCard ship={item} index={index} />)
-                    }
-                </ScrollView>
-            </View>
-        </ImageBackground >
+                    <ScrollView showsHorizontalScrollIndicator={false} horizontal={true} contentContainerStyle={{
+                        height: 220, marginBottom: 10
+                    }}>
+                        {shipData?.Ships?.length > 0 && shipData.Ships.map((item, index) => <ShipCard key={index} ship={item} index={index} />)
+                        }
+                    </ScrollView>
+
+                    <Text style={{ ...styles.title, fontSize: 16, marginBottom: 10 }}>Power Ups :</Text>
+
+                    <ScrollView contentContainerStyle={{
+                        marginTop: 0, marginVertical: 0, marginStart: 0
+                        // height: 280, marginTop: 0
+                    }}>
+                        {shipData?.powerUps?.length > 0 && shipData.powerUps.map((item, index) => <PowerUpCard key={index} powerItem={item} index={index} />)
+                        }
+                    </ScrollView>
+                </View>
+            </BlurView>
+            <Modal animationType="fade" transparent={true} visible={modalVisible}>
+                <View style={styles.modalContainer}>
+                    <View style={[styles.modalContent]}>
+                        {isEmpty(showCoinAlert) ?
+                            <>
+                                <Text style={styles.modalTitle}>Are you sure you wanna buy this Spaceship?</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-around', width: '100%' }}>
+                                    <TouchableOpacity style={{ ...styles.modalButton, backgroundColor: 'gray' }} onPress={() => setModalVisible(false)}>
+                                        <Text style={styles.modalButtonText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.modalButton} onPress={() => handleBuyShip(shipId)}>
+                                        <Text style={styles.modalButtonText}>🚀 Yes</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </> :
+                            <>
+                                <Text style={styles.modalTitle}>{showCoinAlert}</Text>
+                                <TouchableOpacity style={{ ...styles.modalButton, backgroundColor: 'gray' }} onPress={() => { setModalVisible(false); setShowCoinAlert('') }}>
+                                    <Text style={styles.modalButtonText}>Close</Text>
+                                </TouchableOpacity>
+                            </>
+                        }
+                    </View>
+                </View>
+            </Modal>
+        </ImageBackground>
     );
 };
 
@@ -98,7 +260,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     containerInner: {
-        paddingVertical: 30,
+        paddingTop: 30,
         flex: 1,
         width: '100%',
         backgroundColor: 'rgba(0,0,0,0.5)',
@@ -138,20 +300,20 @@ const styles = StyleSheet.create({
     card: {
         // width: 200,
         // height: '100%',
-        backgroundColor: '#1e1e1e',
+        backgroundColor: 'rgba(30, 30, 30,0.3)', //'#1e1e1e',
         borderRadius: 20,
         padding: 15,
         margin: 10,
         alignItems: 'center',
         justifyContent: 'center',
         // justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#393939', // Subtle border to add some depth
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 5,
-        borderWidth: 2,
-        borderColor: Color.primaryColor
+        shadowRadius: 4,
+        elevation: 3,
     },
     image: {
         width: 65,
@@ -174,7 +336,8 @@ const styles = StyleSheet.create({
         fontSize: 12,
         // marginBottom: 10,
         fontFamily: 'Audiowide-Regular',
-        marginTop: 10
+        marginTop: 10,
+        paddingVertical: 8
     },
     costText: {
         color: Color.white, // Tomato color for cost
@@ -207,6 +370,115 @@ const styles = StyleSheet.create({
         borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)'
+    },
+    modalContent: {
+        backgroundColor: '#222',
+        padding: 30,
+        borderRadius: 20,
+        alignItems: 'center',
+        width: '80%',
+        borderWidth: 3,
+        borderColor: '#6200EE',
+        elevation: 10
+    },
+    modalTitle: {
+        fontSize: 14,
+        color: '#FFF',
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 2, height: 2 },
+        textShadowRadius: 5,
+        fontFamily: 'Audiowide-Regular',
+    },
+    modalButton: {
+        marginTop: 20,
+        backgroundColor: '#6200EE',
+        paddingVertical: 15,
+        paddingHorizontal: 30,
+        borderRadius: 10,
+        elevation: 5,
+        shadowColor: '#fff',
+        width: '45%'
+    },
+    modalButtonText: {
+        color: '#fff',
+        fontSize: 10,
+        fontFamily: 'Audiowide-Regular',
+        textAlign: 'center'
+    },
+    powerUpCard: {
+        flexDirection: 'row', // Row layout for name/level on left, button on right
+        backgroundColor: 'rgba(30, 30, 30, 0.5)', // Dark background with slight opacity
+        padding: 10,
+        borderRadius: 10,
+        marginVertical: 8,
+        marginHorizontal: 10,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#393939', // Subtle border to add some depth
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+        width: '95%', // Smaller, more compact width
+    },
+
+    powerUpIcon: {
+        width: 75,
+        height: 75
+    },
+    powerUpInfo: {
+        width: '40%',
+        flexDirection: 'column',
+        justifyContent: 'center',
+    },
+
+    powerUpName: {
+        textTransform: 'capitalize',
+        fontSize: 14,
+        color: '#FFF',
+        fontFamily: 'Audiowide-Regular',
+    },
+
+    powerUpLevel: {
+        fontSize: 12,
+        color: '#AAAAAA',
+        fontFamily: 'Audiowide-Regular',
+        marginTop: 2,
+    },
+
+    powerUpActions: {
+        flexDirection: 'column',
+        alignItems: 'center',
+    },
+
+    powerUpCost: {
+        fontSize: 12,
+        color: '#FFD700', // Gold color for the upgrade cost
+        fontFamily: 'Audiowide-Regular',
+        marginBottom: 5,
+    },
+
+    upgradeButton: {
+        backgroundColor: '#4CAF50', // Green button
+        paddingVertical: 5,
+        paddingHorizontal: 15,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    buttonText: {
+        color: '#FFF',
+        fontSize: 10,
+        fontFamily: 'Audiowide-Regular',
     },
 });
 
