@@ -18,11 +18,15 @@ import TimerBar from '../components/TimerBar.js';
 import styles from './GameStyle.js';
 import Shield from '../assets/Shield.js';
 import CoinMagnet from '../assets/CoinMagnet.js';
+import { getData, spaceShipIcons } from '../utils/index.js';
 
 const { width, height } = Dimensions.get('screen');
 const shipSize = 50;
 const colors = ['red', 'blue', 'orange'];
-
+var activeShipIconIndex = 0
+var shieldTime = 10
+var magnetTime = 10
+var multiplierTime = 10
 export default function GameScreen({ navigation }) {
   const entitiesRef = useRef({});
   const [displayScore, setDisplayScore] = useState(0);
@@ -125,18 +129,20 @@ export default function GameScreen({ navigation }) {
     Matter.World.add(worldRef.current, shipRef.current);
   };
 
-  const clearEntities = () => {
+  const clearEntities = async () => {
     // Clear all bodies from the Matter.js world except the ship
     Matter.World.clear(worldRef.current, false);
 
     // Re-add the ship to the world
     Matter.World.add(worldRef.current, shipRef.current);
 
+    const gameData = await getData('Store')
+    const activeShipIconInd = gameData.Ships.filter(gd => gd.active)[0].id - 1
     // Clear all entities from the GameEngine except the ship
     if (gameEngine.current) {
       gameEngine.current.swap({
         physics: { engine: engineRef.current, world: worldRef.current },
-        spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true, showShield: false, showMagnet: false },
+        spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true, showShield: false, showMagnet: false, activeShipIcon: spaceShipIcons[activeShipIconInd]?.source },
       });
     }
   };
@@ -172,7 +178,7 @@ export default function GameScreen({ navigation }) {
     });
     worldRef.current = engineRef.current.world;
     shipRef.current = Matter.Bodies.rectangle(width / 2, height - shipSize * 2, shipSize, shipSize, { isStatic: true });
-    soundRefs.current.laser.play();
+    soundRefs?.current?.laser?.play();
     initializeWorld();
   };
 
@@ -186,69 +192,79 @@ export default function GameScreen({ navigation }) {
 
   useEffect(() => {
     // Initialize sound effects
-    soundRefs.current.laser = new Sound('laser.wav', Sound.MAIN_BUNDLE, (error) => {
-      if (error) {
-      } else {
-        // Preload the sound
-        soundRefs.current.laser.setVolume(0.02);
-      }
-    });
+    (async () => {
+      const soundEffect = await getData('soundEnabled')
+      const music = await getData('musicEnabled')
+      const gameData = await getData('Store')
+      shieldTime = gameData.powerUps[0].duration
+      magnetTime = gameData.powerUps[1].duration
+      multiplierTime = gameData.powerUps[2].duration
+      console.log(shieldTime, magnetTime, multiplierTime, 'actind')
+      soundRefs.current.laser = new Sound('laser.wav', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+        } else {
+          // Preload the sound
+          soundRefs.current.laser.setVolume(soundEffect ? 0.02 : 0);
+        }
+      });
 
-    soundRefs.current.pop = new Sound('kill.mp3', Sound.MAIN_BUNDLE, (error) => {
-      if (error) {
-      } else {
-        // Preload the sound
-        soundRefs.current.pop.setVolume(0.05);
-      }
-    });
+      soundRefs.current.pop = new Sound('kill.mp3', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+        } else {
+          // Preload the sound
+          soundRefs.current.pop.setVolume(soundEffect ? 0.05 : 0);
+        }
+      });
 
-    soundRefs.current.bossPop = new Sound('enemybosskill.mp3', Sound.MAIN_BUNDLE, (error) => {
-      if (error) {
-      } else {
-        // Preload the sound
-        soundRefs.current.bossPop.setVolume(0.1);
-      }
-    });
+      soundRefs.current.bossPop = new Sound('enemybosskill.mp3', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+        } else {
+          // Preload the sound
+          soundRefs.current.bossPop.setVolume(soundEffect ? 0.1 : 0);
+        }
+      });
 
-    soundRefs.current.explosion = new Sound('explosion.mp3', Sound.MAIN_BUNDLE, (error) => {
-      if (error) {
-      } else {
-        // Preload the sound
-        soundRefs.current.explosion.setVolume(0.5);
-      }
-    });
+      soundRefs.current.explosion = new Sound('explosion.mp3', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+        } else {
+          // Preload the sound
+          soundRefs.current.explosion.setVolume(soundEffect ? 0.5 : 0);
+        }
+      });
 
-    soundRefs.current.powercollection = new Sound('powercollection.wav', Sound.MAIN_BUNDLE, (error) => {
-      if (error) {
-      } else {
-        // Preload the sound
-        soundRefs.current.powercollection.setVolume(0.2);
-      }
-    });
+      soundRefs.current.powercollection = new Sound('powercollection.wav', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+        } else {
+          // Preload the sound
+          soundRefs.current.powercollection.setVolume(soundEffect ? 0.2 : 0);
+        }
+      });
 
-    soundRefs.current.coin = new Sound('coin.wav', Sound.MAIN_BUNDLE, (error) => {
-      if (error) {
-      } else {
-        // Preload the sound
-        soundRefs.current.coin.setVolume(1.0);
-      }
-    });
+      soundRefs.current.coin = new Sound('coin.wav', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+        } else {
+          // Preload the sound
+          soundRefs.current.coin.setVolume(soundEffect ? 1.0 : 0);
+        }
+      });
 
-    soundRefs.current.gameOver = new Sound('game_over.mp3', Sound.MAIN_BUNDLE, (error) => {
-      if (error) {
-      } else {
-        // Preload the sound
-        soundRefs.current.gameOver.setVolume(0.2);
-      }
-    });
+      soundRefs.current.gameOver = new Sound('game_over.mp3', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+        } else {
+          // Preload the sound
+          soundRefs.current.gameOver.setVolume(soundEffect ? 0.2 : 0);
+        }
+      });
 
-    soundRefs.current.lifeLost = new Sound('lifelost.wav', Sound.MAIN_BUNDLE, (error) => {
-      if (error) {
-      } else {
-        // Preload the sound
-        soundRefs.current.lifeLost.setVolume(0.1);
-      }
-    });
+      soundRefs.current.lifeLost = new Sound('lifelost.wav', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+        } else {
+          // Preload the sound
+          soundRefs.current.lifeLost.setVolume(soundEffect ? 0.1 : 0);
+        }
+      });
+    })()
+
 
     // Cleanup sounds when the component unmounts
     return () => {
@@ -918,8 +934,8 @@ export default function GameScreen({ navigation }) {
           // Activate the multiplier
           isMultiplierActiveRef.current = true;
           // setIsMultiplierActive(true);
-          setMultiplierDuration(10); // Set duration to 10 seconds
-          setMultiplierProgress(100); // Set progress bar to 100%
+          setMultiplierDuration(multiplierTime); // Set duration to 10 seconds
+          setMultiplierProgress(multiplierTime * 10); // Set progress bar to 100%
           isPowerUpActive.current = false
         }
 
@@ -945,7 +961,7 @@ export default function GameScreen({ navigation }) {
             if (shipEntity && shipRef.current) {
               shipEntity.showShield = false;
             }
-          }, 10000); // 500ms blink
+          }, shieldTime * 1000); // 500ms blink
 
           // Play powercollection sound
           if (soundRefs.current.powercollection) {
@@ -956,8 +972,8 @@ export default function GameScreen({ navigation }) {
 
           // Activate the shield
           isShieldActive.current = true;
-          setShieldDuration(10); // Set duration to 10 seconds
-          setShieldProgress(100); // Set progress bar to 100%
+          setShieldDuration(shieldTime); // Set duration to 10 seconds
+          setShieldProgress(shieldTime * 10); // Set progress bar to 100%
           isPowerUpActive.current = false; // Reset power-up state
         }
 
@@ -982,7 +998,7 @@ export default function GameScreen({ navigation }) {
             if (shipEntity && shipRef.current) {
               shipEntity.showMagnet = false;
             }
-          }, 30000); // 500ms blink
+          }, magnetTime * 1000); // 500ms blink
 
           // Play powercollection sound
           if (soundRefs.current.powercollection) {
@@ -993,8 +1009,8 @@ export default function GameScreen({ navigation }) {
 
           // Activate the coin magnet
           isCoinMagnetActive.current = true;
-          setCoinMagnetDuration(10); // Set duration to 10 seconds
-          setCoinMagnetProgress(100); // Set progress bar to 100%
+          setCoinMagnetDuration(magnetTime); // Set duration to 10 seconds
+          setCoinMagnetProgress(magnetTime * 10); // Set progress bar to 100%
           isPowerUpActive.current = false;
         }
 
@@ -1144,7 +1160,7 @@ export default function GameScreen({ navigation }) {
         systems={[Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, MegaBombSpawner, MultiplierSpawner, ShieldSpawner, CoinMagnetSpawner, CoinAttractionSystem, handleCollisions, CleanupEntities, moveMega, TimerSystem]}
         entities={{
           physics: { engine: engineRef.current, world: worldRef.current },
-          spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true, showShield: false, showMagnet: false },
+          spaceship: { body: shipRef.current, size: [shipSize, shipSize], renderer: Spaceship, isVisible: true, showShield: false, showMagnet: false, activeShipIcon: spaceShipIcons[activeShipIconIndex]?.source },
         }}
         running={!gameOver && !gamePause} // Stop the game loop when game is over
       >
@@ -1165,9 +1181,9 @@ export default function GameScreen({ navigation }) {
           <Image source={require('../assets/imgaes/bomb.gif')} style={styles.megaBombIcon} />
           <Text style={styles.megaBombCount}>{megaBombCount}</Text>
         </TouchableOpacity>
-        <TimerBar multiplierProgress={multiplierProgress} isMultiplierActive={isMultiplierActiveRef.current} />
-        <TimerBar multiplierProgress={shieldProgress} isMultiplierActive={isShieldActive.current} />
-        <TimerBar multiplierProgress={coinMagnetProgress} isMultiplierActive={isCoinMagnetActive.current} />
+        <TimerBar multiplierProgress={multiplierProgress} isMultiplierActive={isMultiplierActiveRef.current} range={multiplierTime * 10} />
+        <TimerBar multiplierProgress={shieldProgress} isMultiplierActive={isShieldActive.current} range={shieldTime * 10} />
+        <TimerBar multiplierProgress={coinMagnetProgress} isMultiplierActive={isCoinMagnetActive.current} range={magnetTime * 10} />
       </GameEngine>
       {/* Modal for User Name Input */}
       <Modal animationType="fade" transparent={true} visible={modalVisible}>
@@ -1189,7 +1205,7 @@ export default function GameScreen({ navigation }) {
           <View style={[styles.modalContent]}>
             <Text style={styles.modalTitle}>GAME PAUSE</Text>
 
-            <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false), setShowPauseModal(false), soundRefs.current.laser.play(); }}>
+            <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false), setShowPauseModal(false), soundRefs?.current?.laser?.play(); }}>
               <Text style={styles.modalButtonText}>Resume</Text>
             </TouchableScale>
             <TouchableScale onPress={() => navigation.replace('MainMenu')} style={styles.modalButton} >

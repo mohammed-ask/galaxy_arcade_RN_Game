@@ -1,15 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ImageBackground, Image, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, Image, ScrollView, TouchableOpacity, Modal, BackHandler } from 'react-native';
 import { Color, isEmpty, powerUpIcons, spaceShipIcons } from '../utils';
 import { BlurView } from '@react-native-community/blur';
 import TouchableScale from 'react-native-touchable-scale';
 
-const Shop = () => {
+const Shop = ({ navigation }) => {
     const [shipData, setShipData] = useState([])
     const [modalVisible, setModalVisible] = useState(false);
     const [shipId, setShipId] = useState({});
-    const [showCoinAlert, setShowCoinAlert] = useState(false);
+    const [showCoinAlert, setShowCoinAlert] = useState('');
     const [userDetail, setUserDetail] = useState({ userName: '', bestScore: '', Coins: '' });
 
     useEffect(() => {
@@ -18,6 +18,14 @@ const Shop = () => {
             // await AsyncStorage.setItem('musicEnabled', 'true');
             // AsyncStorage.setItem('Coins', '1500')
         })()
+        const backHandler = BackHandler.addEventListener(
+            'hardwareBackPress',
+            () => {
+                navigation.navigate('MainMenu')
+            },
+        );
+
+        return () => backHandler.remove();
     }, [])
 
     useEffect(() => {
@@ -122,7 +130,6 @@ const Shop = () => {
 
     useEffect(() => {
         (async () => {
-            console.log('setitemuu', JSON.stringify(shipData.Ships))
             if (!isEmpty(shipData)) {
                 await AsyncStorage.setItem('Store', JSON.stringify(shipData))
             }
@@ -215,9 +222,8 @@ const Shop = () => {
 
                     <Text style={{ ...styles.title, fontSize: 16, marginBottom: 10 }}>Power Ups :</Text>
 
-                    <ScrollView contentContainerStyle={{
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{
                         marginTop: 0, marginVertical: 0, marginStart: 0
-                        // height: 280, marginTop: 0
                     }}>
                         {shipData?.powerUps?.length > 0 && shipData.powerUps.map((item, index) => <PowerUpCard key={index} powerItem={item} index={index} />)
                         }
@@ -479,6 +485,21 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 10,
         fontFamily: 'Audiowide-Regular',
+    },
+    backButton: {
+        backgroundColor: '#6200EE', // Gold color for buttons
+        paddingHorizontal: 30,
+        paddingVertical: 10,
+        borderRadius: 10,
+        // marginTop: 40,
+        width: '40%',
+        alignSelf: 'center'
+    },
+    backButtonText: {
+        fontSize: 24,
+        color: '#fff',
+        textAlign: 'center',
+        fontFamily: 'Audiowide-Regular', // Use a pixelated font
     },
 });
 

@@ -2,9 +2,11 @@ import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
-const TimerBar = ({ isMultiplierActive, multiplierProgress }) => {
+const TimerBar = ({ isMultiplierActive, multiplierProgress, range }) => {
     const progressAnim = useRef(new Animated.Value(0)).current;
-
+    // if (isMultiplierActive) {
+    //     console.log(range, isMultiplierActive, multiplierProgress, ' ranggg')
+    // }
     // Animate the progress bar when multiplierProgress changes
     useEffect(() => {
         Animated.timing(progressAnim, {
@@ -16,9 +18,10 @@ const TimerBar = ({ isMultiplierActive, multiplierProgress }) => {
 
     // Determine gradient colors based on progress
     const getGradientColors = () => {
-        if (multiplierProgress >= 56) {
+        const progressPercentage = (multiplierProgress / range) * 100;
+        if (progressPercentage >= 56) {
             return ['orange', '#00CC00']; // Green gradient
-        } else if (multiplierProgress >= 33) {
+        } else if (progressPercentage >= 33) {
             return ['red', '#FF8C00']; // Orange gradient
         } else {
             return ['#670000', 'red']; // Red gradient
@@ -36,8 +39,8 @@ const TimerBar = ({ isMultiplierActive, multiplierProgress }) => {
                         styles.durationBar,
                         {
                             width: progressAnim.interpolate({
-                                inputRange: [0, 100],
-                                outputRange: ['0%', '100%'],
+                                inputRange: [0, range],
+                                outputRange: ['0%', `100%`],
                             }),
                         },
                     ]}
