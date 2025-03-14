@@ -84,7 +84,7 @@ const Settings = ({ navigation }) => {
                 {/* Back Button */}
                 <TouchableScale
                     style={styles.backButton}
-                    onPress={() => navigation.goBack()}
+                    onPress={() => navigation.replace("MainMenu")}
                 >
                     <Text style={styles.backButtonText}>Back</Text>
                 </TouchableScale>

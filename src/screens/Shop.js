@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ImageBackground, Image, ScrollView, TouchableOpacity, Modal, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, Image, ScrollView, TouchableOpacity, Modal, BackHandler, Alert } from 'react-native';
 import { Color, isEmpty, powerUpIcons, spaceShipIcons } from '../utils';
 import { BlurView } from '@react-native-community/blur';
 import TouchableScale from 'react-native-touchable-scale';
@@ -14,19 +14,21 @@ const Shop = ({ navigation }) => {
 
     useEffect(() => {
         (async () => {
-            // await AsyncStorage.setItem('soundEnabled', 'true');
-            // await AsyncStorage.setItem('musicEnabled', 'true');
             // AsyncStorage.setItem('Coins', '1500')
         })()
+        const backAction = () => {
+            navigation.navigate('MainMenu')
+            return true
+        };
+
         const backHandler = BackHandler.addEventListener(
             'hardwareBackPress',
-            () => {
-                navigation.navigate('MainMenu')
-            },
+            backAction
         );
 
+        // Clean up the event listener on component unmount
         return () => backHandler.remove();
-    }, [])
+    }, []);
 
     useEffect(() => {
         const checkUserDetails = async () => {
@@ -54,7 +56,7 @@ const Shop = ({ navigation }) => {
 
     const handleBuyShip = () => {
         try {
-            if (userDetail.Coins > shipId.cost) {
+            if (userDetail.Coins >= shipId.cost) {
                 setShipData(prevState => ({
                     ...prevState,
                     Ships: prevState.Ships.map(ship =>
@@ -137,15 +139,35 @@ const Shop = ({ navigation }) => {
     }, [shipData])
 
     const ShipCard = ({ ship, index }) => {
-        const { name, unlock, cost, active, id } = ship;
+        const { name, unlock, cost, active, id, specs } = ship;
+        const [showTooltip, setShowTooltip] = useState(false);  // Tooltip visibility state
 
         return (
             <ImageBackground blurRadius={1} style={styles.card}>
+                {/* Info Icon */}
+                <View style={{ ...styles.infoContainer, display: isEmpty(specs) ? 'none' : 'flex' }}>
+                    <TouchableOpacity
+                        style={styles.infoIcon}
+                        onPress={() => setShowTooltip(!showTooltip)} // Toggle tooltip visibility
+                    >
+                        <Image source={require('../assets/imgaes/info.png')} style={styles.iconImage} />
+                    </TouchableOpacity>
+
+                    {/* Tooltip */}
+                    {showTooltip && (
+                        <View style={styles.tooltip}>
+                            {specs.map(item => <Text style={styles.tooltipText}>
+                                {item}
+                            </Text>)}
+                        </View>
+                    )}
+                </View>
                 {/* Image */}
                 <Image source={spaceShipIcons[index].source} style={styles.image} />
 
                 {/* Ship Name */}
                 <Text style={styles.name}>{name}</Text>
+
 
                 {/* If the ship is locked, show cost and "Buy" button */}
                 {unlock ? (
@@ -319,13 +341,14 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,
-        elevation: 3,
+        // elevation: 3,
     },
     image: {
         width: 65,
         height: 65,
         borderRadius: 10,
         marginBottom: 10,
+        zIndex: -5
     },
     name: {
         color: '#fff',
@@ -467,13 +490,13 @@ const styles = StyleSheet.create({
 
     powerUpCost: {
         fontSize: 12,
-        color: '#FFD700', // Gold color for the upgrade cost
+        color: 'yellow', // Gold color for the upgrade cost
         fontFamily: 'Audiowide-Regular',
         marginBottom: 5,
     },
 
     upgradeButton: {
-        backgroundColor: '#4CAF50', // Green button
+        backgroundColor: Color.primaryColor, // Green button
         paddingVertical: 5,
         paddingHorizontal: 15,
         borderRadius: 8,
@@ -500,6 +523,38 @@ const styles = StyleSheet.create({
         color: '#fff',
         textAlign: 'center',
         fontFamily: 'Audiowide-Regular', // Use a pixelated font
+    },
+    infoContainer: {
+        position: 'relative', // Ensure the tooltip is positioned relative to the icon
+        backgroundColor: 'transparent',
+        alignSelf: 'flex-end'
+    },
+    infoIcon: {
+        marginTop: 5,
+        width: 20,
+        height: 20,
+        alignSelf: 'center',
+    },
+    iconImage: {
+        width: '100%',
+        height: '100%',
+    },
+    tooltip: {
+        position: 'absolute',
+        top: 20, // Position above the icon
+        right: 10, // Adjust for centering
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        padding: 10,
+        borderRadius: 10,
+        zIndex: 50,
+        width: '100%',
+        alignItems: 'center',
+    },
+    tooltipText: {
+        color: '#fff',
+        fontSize: 10,
+        textAlign: 'center',
+        fontFamily: 'Audiowide-Regular',
     },
 });
 
