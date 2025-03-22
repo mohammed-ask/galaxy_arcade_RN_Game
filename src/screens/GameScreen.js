@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Modal, Text, ImageBackground, StatusBar, AppState, BackHandler } from 'react-native';
+import { View, Modal, Text, ImageBackground, StatusBar, AppState, BackHandler, Dimensions } from 'react-native';
 import Matter from 'matter-js';
 import { GameEngine } from 'react-native-game-engine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,14 +8,18 @@ import Sound from 'react-native-sound';
 import {
     Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, MegaBombSpawner,
     MultiplierSpawner, ShieldSpawner, CoinMagnetSpawner, CoinAttractionSystem,
-    handleCollisions, CleanupEntities, MoveMega, TimerSystem, initializeSystems
+    handleCollisions, CleanupEntities, MoveMega, TimerSystem, initializeSystems,
+    useMegaBomb
 } from './systems';
 import { createShip } from './entities';
-import { shipSize, spaceShipIcons, SHIELD_DURATION, MAGNET_DURATION, MULTIPLIER_DURATION } from './constants';
+import { shipSize, spaceShipIcons, SHIELD_DURATION, MAGNET_DURATION, MULTIPLIER_DURATION, updatePowerUp } from './constants';
 import { initializeSounds, cleanupSounds, getData, updateBestScore } from './utils';
 import HUD from './HUD';
 import Spaceship from '../assets/Spaceship';
 import styles from './GameStyle';
+import Explosion from '../assets/Explosion';
+
+const { width, height } = Dimensions.get('screen');
 
 export default function GameScreen({ navigation }) {
     const gameEngine = useRef(null);
@@ -25,7 +29,6 @@ export default function GameScreen({ navigation }) {
     const entitiesRef = useRef({});
     const whooshRef = useRef(null);
 
-    // Game state
     const gameStateRef = useRef({
         lives: 3,
         score: 0,
@@ -47,13 +50,20 @@ export default function GameScreen({ navigation }) {
         bulletCombo: 2,
     });
 
+    const [displayScore, setDisplayScore] = useState(0);
+    const [displayCoins, setDisplayCoins] = useState(0);
+    const [displayLives, setDisplayLives] = useState(3);
+    const [displayMegaBombCount, setDisplayMegaBombCount] = useState(0);
     const [gameOver, setGameOver] = useState(false);
     const [gamePause, setGamePause] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [showPauseModal, setShowPauseModal] = useState(false);
     const [appState, setAppState] = useState(AppState.currentState);
+    const [showBlinkingHeart, setShowBlinkingHeart] = useState(false);
+    const [coinMagnetDuration, setCoinMagnetDuration] = useState(0);
+    const [shieldDuration, setShieldDuration] = useState(0);
+    const [multiplierDuration, setMultiplierDuration] = useState(0);
 
-    // Initialize game
     useEffect(() => {
         const initializeGame = async () => {
             const music = await getData('musicEnabled');
@@ -69,7 +79,18 @@ export default function GameScreen({ navigation }) {
             }
             initializeSounds();
             await resetGame();
-            initializeSystems(entitiesRef, gameStateRef, shipRef);
+            // Pass setters to systems.js
+            initializeSystems(entitiesRef, gameStateRef, shipRef, {
+                setDisplayScore,
+                setDisplayCoins,
+                setDisplayLives,
+                setDisplayMegaBombCount,
+                setGameOver,
+                setCoinMagnetDuration,
+                setMultiplierDuration,
+                setShieldDuration,
+                setShowBlinkingHeart
+            });
         };
 
         initializeGame();
@@ -84,7 +105,6 @@ export default function GameScreen({ navigation }) {
         };
     }, []);
 
-    // Handle app state changes (background/foreground)
     const handleAppStateChange = async (nextAppState) => {
         const music = await getData('musicEnabled');
         if (appState.match(/inactive|background/) && nextAppState === 'active') {
@@ -116,13 +136,20 @@ export default function GameScreen({ navigation }) {
 
     // Stop the game
     const stopGame = () => {
-        console.log('hyyy')
         Matter.Engine.clear(engineRef.current); // Stop the physics engine
         Matter.World.clear(worldRef.current, false);
         if (gameEngine.current) {
             gameEngine.current.stop(); // Stop the GameEngine
         }
     };
+
+    useEffect(() => {
+        if (showBlinkingHeart) {
+            setInterval(() => {
+                setShowBlinkingHeart(false)
+            }, 600);
+        }
+    }, [showBlinkingHeart])
 
     // Reset game state
     const resetGame = async () => {
@@ -136,6 +163,7 @@ export default function GameScreen({ navigation }) {
             { duration: MAGNET_DURATION },
             { duration: MULTIPLIER_DURATION },
         ];
+        updatePowerUp(powerUps)
 
         gameStateRef.current = {
             lives: activeShip.lives,
@@ -175,11 +203,13 @@ export default function GameScreen({ navigation }) {
         setGamePause(false);
         setModalVisible(false);
         setShowPauseModal(false);
-
+        setDisplayScore(0);
+        setDisplayCoins(0);
+        setDisplayLives(activeShip.lives);
+        setDisplayMegaBombCount(0);
         gameEngine.current?.swap(entitiesRef.current);
     };
 
-    // Game over and level progression
     useEffect(() => {
         if (gameStateRef.current.lives <= 0 && !gameOver) {
             updateBestScore(gameStateRef.current.score, gameStateRef.current.coins);
@@ -188,36 +218,41 @@ export default function GameScreen({ navigation }) {
                 setModalVisible(true);
             }, 300);
         }
-        if (gameStateRef.current.score >= 200 && !gameStateRef.current.levelUp) {
-            gameStateRef.current.levelUp = true;
-        }
-        if (gameStateRef.current.score >= 500 && !gameStateRef.current.level3) {
-            gameStateRef.current.level3 = true;
-        }
+        // if (gameStateRef.current.score >= 10000 && !gameStateRef.current.levelUp) {
+        //     console.log('gamechange')
+        //     gameStateRef.current.levelUp = true;
+        // }
+        // if (gameStateRef.current.score >= 50000 && !gameStateRef.current.level3) {
+        //     gameStateRef.current.level3 = true;
+        // }
     }, [gameStateRef.current.lives, gameStateRef.current.score]);
 
-    // Power-up duration timers
     useEffect(() => {
         const intervals = [];
         if (gameStateRef.current.shieldDuration > 0) {
             intervals.push(setInterval(() => {
                 gameStateRef.current.shieldDuration -= 1;
+                setShieldDuration(prev => prev - 1)
                 if (gameStateRef.current.shieldDuration <= 0) {
                     gameStateRef.current.isShieldActive = false;
+                    entitiesRef.current.spaceship.showShield = false;
                 }
             }, 1000));
         }
         if (gameStateRef.current.coinMagnetDuration > 0) {
             intervals.push(setInterval(() => {
                 gameStateRef.current.coinMagnetDuration -= 1;
+                setCoinMagnetDuration(prev => prev - 1)
                 if (gameStateRef.current.coinMagnetDuration <= 0) {
                     gameStateRef.current.isCoinMagnetActive = false;
+                    entitiesRef.current.spaceship.showMagnet = false;
                 }
             }, 1000));
         }
         if (gameStateRef.current.multiplierDuration > 0) {
             intervals.push(setInterval(() => {
                 gameStateRef.current.multiplierDuration -= 1;
+                setMultiplierDuration(prev => prev - 1)
                 if (gameStateRef.current.multiplierDuration <= 0) {
                     gameStateRef.current.isMultiplierActive = false;
                 }
@@ -230,22 +265,41 @@ export default function GameScreen({ navigation }) {
         gameStateRef.current.multiplierDuration,
     ]);
 
-    // In GameScreen.js
-    const handleMegaBomb = () => {
-        if (gameStateRef.current.megaBombCount > 0) {
-            gameStateRef.current.megaBombCount -= 1;
-            entitiesRef.current = useMegaBomb(entitiesRef.current); // Import from systems.js
-        }
-    };
-
-    // Pause game
     const pauseGame = () => {
         setGamePause(true);
         updateBestScore(gameStateRef.current.score, gameStateRef.current.coins);
         setShowPauseModal(true);
     };
 
-    // Systems array
+    const handleMegaBomb = () => {
+        if (gameStateRef.current.megaBombCount > 0) {
+            gameStateRef.current.megaBombCount -= 1;
+            entitiesRef.current = useMegaBomb(entitiesRef.current); // Import from systems.js
+        }
+        // try {
+        //     if (gameStateRef.current.megaBombCount > 0) {
+        //         gameStateRef.current.megaBombCount -= 1;
+        //         setDisplayMegaBombCount(gameStateRef.current.megaBombCount);
+        //         Object.keys(entitiesRef.current).forEach(key => {
+        //             const entity = entitiesRef.current[key];
+        //             if (entity.body && ['asteroid', 'meteor', 'mega'].includes(entity.body.label)) {
+        //                 Matter.World.remove(worldRef.current, entity.body);
+        //                 delete entitiesRef.current[key];
+        //             }
+        //         });
+        //         const explosion = Matter.Bodies.circle(width / 2, height / 2, 100, { isStatic: true, isSensor: true });
+        //         Matter.World.add(worldRef.current, explosion);
+        //         entitiesRef.current[`explosion_${explosion.id}`] = {
+        //             body: explosion,
+        //             renderer: Explosion,
+        //             timeout: setTimeout(() => delete entitiesRef.current[`explosion_${explosion.id}`], 2000),
+        //         };
+        //     }
+        // } catch (e) {
+        //     console.log(e, 'handlemegabomb')
+        // }
+    };
+
     const systems = [
         Physics,
         TimerSystem,
@@ -273,10 +327,9 @@ export default function GameScreen({ navigation }) {
                 running={!gameOver && !gamePause}
             >
                 <StatusBar hidden={true} />
-                <HUD gameState={gameStateRef.current} onUseMegaBomb={handleMegaBomb} />
+                <HUD gameState={gameStateRef.current} onUseMegaBomb={() => useMegaBomb()} showBlinkingHeart={showBlinkingHeart} />
             </GameEngine>
 
-            {/* Game Over Modal */}
             <Modal animationType="fade" transparent={true} visible={modalVisible}>
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
@@ -291,7 +344,6 @@ export default function GameScreen({ navigation }) {
                 </View>
             </Modal>
 
-            {/* Pause Modal */}
             <Modal animationType="fade" transparent={true} visible={showPauseModal}>
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>

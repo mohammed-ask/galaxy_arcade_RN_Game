@@ -2,8 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
-const TimerBar = ({ isMultiplierActive, multiplierProgress, range }) => {
+const TimerBar = ({ isMultiplierActive, multiplierProgress, range, top }) => {
     const progressAnim = useRef(new Animated.Value(0)).current;
+    console.log(top, isMultiplierActive, range)
     // if (isMultiplierActive) {
     //     console.log(range, isMultiplierActive, multiplierProgress, ' ranggg')
     // }
@@ -29,7 +30,7 @@ const TimerBar = ({ isMultiplierActive, multiplierProgress, range }) => {
     };
 
     return (
-        <View style={{ ...styles.durationBarContainer, display: isMultiplierActive ? 'flex' : 'none' }}>
+        <View style={{ ...styles.durationBarContainer, top: top, display: isMultiplierActive ? 'flex' : 'none' }}>
             <View style={styles.durationBarBackground}>
                 {/* Striped Pattern */}
                 <View style={styles.stripedPattern} />

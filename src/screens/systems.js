@@ -1,8 +1,8 @@
 import Matter from 'matter-js';
-import { Dimensions } from 'react-native';
+import { Dimensions, Vibration } from 'react-native';
 import { playSound } from './utils';
-import { getBulletFromPool, getAsteroidFromPool, getCoinFromPool } from './entities'; // Assuming entity pooling
-import { shipSize, colors, asteroidImages } from './constants';
+import { getBulletFromPool, getAsteroidFromPool, getCoinFromPool, createExplosion, getBullet2FromPool } from './entities'; // Assuming entity pooling
+import { shipSize, colors, asteroidImages, MULTIPLIER_DURATION, SHIELD_DURATION, MAGNET_DURATION, EXPLOSION_DURATION } from './constants';
 import Bullet from '../assets/Bullets';
 import Asteroid from '../assets/Ufo';
 import Coin from '../assets/Coin';
@@ -12,6 +12,7 @@ import Shield from '../assets/Shield';
 import CoinMagnet from '../assets/CoinMagnet';
 import Boom from '../assets/Boom';
 import Explosion from '../assets/Explosion';
+import { isEmpty } from '../utils';
 
 const { width, height } = Dimensions.get('screen');
 
@@ -35,15 +36,18 @@ let accumulator = 0;
 
 export const Physics = (entities, { time }) => {
     try {
+        // console.log(entities, 'entitit')
         accumulator += time.delta;
         while (accumulator >= FIXED_TIME_STEP) {
             Matter.Engine.update(entities.physics.engine, FIXED_TIME_STEP);
             accumulator -= FIXED_TIME_STEP;
         }
         entitiesRef.current = entities; // Update ref for other systems
+        // Log entity and physics body counts
+        // console.log('Physics - Entity count:', Object.keys(entities).length, 'Physics bodies:', Matter.Composite.allBodies(entities.physics.world).length);
         return entities;
     } catch (e) {
-        console.log(e)
+        console.log('physics error', e)
     }
 };
 
@@ -100,26 +104,37 @@ export const CoinAttractionSystem = (entities, { time }) => {
 
 let bulletCooldown = 0;
 export const BulletShooter = (entities, { time }) => {
-    bulletCooldown += time.delta;
-    if (bulletCooldown > gameStateRef.current.bulletSpeed) {
-        bulletCooldown = 0;
-        playSound('laser', 10000);
-
-        const bullet = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
-        if (bullet) {
-            Matter.World.add(entities.physics.world, bullet);
-            entities[`bullet_${bullet.id}`] = { body: bullet, color: 'yellow', renderer: Bullet };
+    try {
+        if (!entities || !entities.physics || !entities.physics.world) {
+            console.warn('BulletShooter: entities or entities.physics is undefined');
+            return entities || entitiesRef.current || {};
         }
+        bulletCooldown += time.delta;
+        if (bulletCooldown > gameStateRef.current.bulletSpeed) {
+            bulletCooldown = 0;
+            playSound('laser', 10000);
 
-        if (gameStateRef.current.levelUp) { // Assuming levelUp is tracked in gameStateRef
-            const bullet2 = getBulletFromPool(shipRef.current.position.x + 10, shipRef.current.position.y - 30);
-            if (bullet2) {
-                Matter.World.add(entities.physics.world, bullet2);
-                entities[`bullet_${bullet2.id}`] = { body: bullet2, color: 'yellow', renderer: Bullet };
+            const isLevelUp = gameStateRef.current.score >= 200;
+            if (!isLevelUp) {
+                const bullet = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
+                Matter.World.add(entities.physics.world, bullet);
+                entities[`bullet_${bullet.id}`] = { body: bullet, color: 'yellow', renderer: Bullet };
+            }
+            if (isLevelUp) { // Assuming levelUp is tracked in gameStateRef
+                const bullet2 = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
+                const bullet3 = getBulletFromPool(shipRef.current.position.x + 10, shipRef.current.position.y - 30);
+                if (bullet2 && bullet3) {
+                    Matter.World.add(entities.physics.world, bullet2);
+                    Matter.World.add(entities.physics.world, bullet3);
+                    entities[`bullet_${bullet2.id}_${Date.now()}_1`] = { body: bullet2, color: 'yellow', renderer: Bullet };
+                    entities[`bullet_${bullet3.id}_${Date.now()}_2`] = { body: bullet3, color: 'yellow', renderer: Bullet };
+                }
             }
         }
+        return entities;
+    } catch (e) {
+        console.log('bulletshooter', e)
     }
-    return entities;
 };
 
 let asteroidCooldown = 0;
@@ -159,7 +174,7 @@ export const AsteroidSpawner = (entities, { time }) => {
         Object.keys(entities).forEach(key => {
             const entity = entities[key];
             if (entity.body?.label === 'mega' && Math.random() < 0.01) {
-                const bullet = getBulletFromPool(entity.body.position.x, entity.body.position.y + 30, true);
+                const bullet = getBulletFromPool(entity.body.position.x + 10, entity.body.position.y + 30, true);
                 if (bullet) {
                     Matter.Body.setVelocity(bullet, { x: 0, y: 3 });
                     Matter.World.add(entities.physics.world, bullet);
@@ -175,117 +190,141 @@ export const AsteroidSpawner = (entities, { time }) => {
 };
 
 export const MoveMega = (entities, { time }) => {
-    Object.keys(entities).forEach(key => {
-        const entity = entities[key];
-        if (entity.body?.label === 'mega') {
-            const t = time.current / 1000;
-            const amplitude = 100;
-            const frequency = 0.5;
-            const x = entity.body.position.x + Math.sin(t * frequency) * amplitude * 0.05;
-            const clampedX = Math.max(30, Math.min(width - 30, x));
-            Matter.Body.setPosition(entity.body, { x: clampedX, y: entity.body.position.y + 0.01 });
-        }
-    });
-    return entities;
+    try {
+        Object.keys(entities).forEach(key => {
+            const entity = entities[key];
+            if (entity.body?.label === 'mega') {
+                const t = time.current / 1000;
+                const amplitude = 100;
+                const frequency = 0.5;
+                const x = entity.body.position.x + Math.sin(t * frequency) * amplitude * 0.05;
+                const clampedX = Math.max(30, Math.min(width - 30, x));
+                Matter.Body.setPosition(entity.body, { x: clampedX, y: entity.body.position.y + 0.01 });
+            }
+        });
+        return entities;
+    } catch (e) {
+        console.log(e, 'movemega')
+    }
 };
 
 let coinCooldown = 0;
 export const CoinSpawner = (entities, { time }) => {
-    coinCooldown += time.delta;
-    if (coinCooldown > 1000 && Math.random() < 0.002) {
-        coinCooldown = 0;
-        const pattern = Math.floor(Math.random() * 3);
-        const numCoins = 5;
-        const spacing = 50;
-        let x, dx, dy;
+    try {
+        coinCooldown += time.delta;
+        if (coinCooldown > 1000 && Math.random() < 0.002) {
+            coinCooldown = 0;
+            const pattern = Math.floor(Math.random() * 3);
+            const numCoins = 5;
+            const spacing = 50;
+            let x, dx, dy;
 
-        switch (pattern) {
-            case 0: // Vertical
-                x = Math.random() * (width - 20) + 10;
-                dx = 0;
-                dy = spacing;
-                break;
-            case 1: // Diagonal left-to-right
-                x = Math.random() * (width - 20 * numCoins) + 10;
-                dx = spacing;
-                dy = spacing;
-                break;
-            case 2: // Diagonal right-to-left
-                x = Math.random() * (width - 20 * numCoins) + 10 + 20 * numCoins;
-                dx = -spacing;
-                dy = spacing;
-                break;
-        }
+            switch (pattern) {
+                case 0: // Vertical
+                    x = Math.random() * (width - 20) + 10;
+                    dx = 0;
+                    dy = spacing;
+                    break;
+                case 1: // Diagonal left-to-right
+                    x = Math.random() * (width - 20 * numCoins) + 10;
+                    dx = spacing;
+                    dy = spacing;
+                    break;
+                case 2: // Diagonal right-to-left
+                    x = Math.random() * (width - 20 * numCoins) + 10 + 20 * numCoins;
+                    dx = -spacing;
+                    dy = spacing;
+                    break;
+            }
 
-        for (let i = 0; i < numCoins; i++) {
-            const coin = getCoinFromPool(x + i * dx, i * dy);
-            if (coin) {
-                Matter.World.add(entities.physics.world, coin);
-                entities[`coin_${coin.id}_${i}`] = { body: coin, renderer: Coin };
+            for (let i = 0; i < numCoins; i++) {
+                const coin = getCoinFromPool(x + i * dx, i * dy);
+                if (coin) {
+                    Matter.World.add(entities.physics.world, coin);
+                    entities[`coin_${coin.id}_${i}`] = { body: coin, renderer: Coin };
+                }
             }
         }
+        return entities;
+    } catch (e) {
+        console.log('coinspawn', e)
     }
-    return entities;
 };
 
 export const MegaBombSpawner = (entities) => {
-    if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
-        const x = Math.random() * (width - 40) + 20;
-        const megaBomb = Matter.Bodies.circle(x, 0, 20, {
-            label: 'megaBomb',
-            isSensor: true,
-            frictionAir: 0.2,
-        });
-        Matter.World.add(entities.physics.world, megaBomb);
-        entities[`megaBomb_${Date.now()}`] = { body: megaBomb, renderer: Bomb };
-        gameStateRef.current.isPowerUpActive = true;
+    try {
+        if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
+            const x = Math.random() * (width - 40) + 20;
+            const megaBomb = Matter.Bodies.circle(x, 0, 20, {
+                label: 'megaBomb',
+                isSensor: true,
+                frictionAir: 0.2,
+            });
+            Matter.World.add(entities.physics.world, megaBomb);
+            entities[`megaBomb_${Date.now()}`] = { body: megaBomb, renderer: Bomb };
+            gameStateRef.current.isPowerUpActive = true;
+        }
+        return entities;
+    } catch (e) {
+        console.log(e, 'megabomb')
     }
-    return entities;
 };
 
 export const MultiplierSpawner = (entities) => {
-    if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
-        const x = Math.random() * (width - 40) + 20;
-        const multiplier = Matter.Bodies.circle(x, 0, 30, {
-            label: 'multiplier',
-            isSensor: true,
-            frictionAir: 0.2,
-        });
-        Matter.World.add(entities.physics.world, multiplier);
-        entities[`multiplier_${Date.now()}`] = { body: multiplier, renderer: Star };
-        gameStateRef.current.isPowerUpActive = true;
+    try {
+        if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
+            const x = Math.random() * (width - 40) + 20;
+            const multiplier = Matter.Bodies.circle(x, 0, 30, {
+                label: 'multiplier',
+                isSensor: true,
+                frictionAir: 0.2,
+            });
+            Matter.World.add(entities.physics.world, multiplier);
+            entities[`multiplier_${Date.now()}`] = { body: multiplier, renderer: Star };
+            gameStateRef.current.isPowerUpActive = true;
+        }
+        return entities;
+    } catch (e) {
+        console.log('multiplierspwan', e)
     }
-    return entities;
 };
 
 export const ShieldSpawner = (entities) => {
-    if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
-        const x = Math.random() * (width - 40) + 20;
-        const shield = Matter.Bodies.circle(x, 0, 20, {
-            label: 'shield',
-            isSensor: true,
-            frictionAir: 0.2,
-        });
-        Matter.World.add(entities.physics.world, shield);
-        entities[`shield_${Date.now()}`] = { body: shield, renderer: Shield };
-        gameStateRef.current.isPowerUpActive = true;
+    try {
+        if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
+            const x = Math.random() * (width - 40) + 20;
+            const shield = Matter.Bodies.circle(x, 0, 20, {
+                label: 'shield',
+                isSensor: true,
+                frictionAir: 0.2,
+            });
+            Matter.World.add(entities.physics.world, shield);
+            entities[`shield_${Date.now()}`] = { body: shield, renderer: Shield };
+            gameStateRef.current.isPowerUpActive = true;
+        }
+        return entities;
+    } catch (e) {
+        console.log('shieldspwan', e)
     }
-    return entities;
 };
 
 export const CoinMagnetSpawner = (entities) => {
-    if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
-        const x = Math.random() * (width - 40) + 20;
-        const coinMagnet = Matter.Bodies.circle(x, 0, 20, {
-            label: 'coinMagnet',
-            isSensor: true,
-            frictionAir: 0.2,
-        });
-        Matter.World.add(entities.physics.world, coinMagnet);
-        entities[`coinMagnet_${Date.now()}`] = { body: coinMagnet, renderer: CoinMagnet };
-        gameStateRef.current.isPowerUpActive = true;
+    try {
+        if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
+            const x = Math.random() * (width - 40) + 20;
+            const coinMagnet = Matter.Bodies.circle(x, 0, 20, {
+                label: 'coinMagnet',
+                isSensor: true,
+                frictionAir: 0.2,
+            });
+            Matter.World.add(entities.physics.world, coinMagnet);
+            entities[`coinMagnet_${Date.now()}`] = { body: coinMagnet, renderer: CoinMagnet };
+            gameStateRef.current.isPowerUpActive = true;
+        }
+        return entities;
+    } catch (e) {
+        console.log('coinmagenr', e)
     }
-    return entities;
 };
 
 export const handleCollisions = (entities) => {
@@ -299,7 +338,7 @@ export const handleCollisions = (entities) => {
         Matter.Events.on(entities.physics.engine, 'collisionStart', (event) => {
             event.pairs.forEach(pair => {
                 if (pair.isProcessed) return;
-                pair.isProcessed = true;
+
 
                 const [bodyA, bodyB] = [pair.bodyA, pair.bodyB];
                 const bullet = bodyA.label === 'bullet' ? bodyA : bodyB.label === 'bullet' ? bodyB : null;
@@ -309,32 +348,39 @@ export const handleCollisions = (entities) => {
                 const powerUp = ['megaBomb', 'multiplier', 'shield', 'coinMagnet'].includes(bodyA.label) ? bodyA : ['megaBomb', 'multiplier', 'shield', 'coinMagnet'].includes(bodyB.label) ? bodyB : null;
 
                 if (bullet && target) {
+                    pair.isProcessed = true;
                     const targetKey = Object.keys(entities).find(key => entities[key].body === target);
                     Matter.World.remove(entities.physics.world, bullet);
                     delete entities[Object.keys(entities).find(key => entities[key].body === bullet)];
+                    if (!isEmpty(entities[targetKey])) {
+                        entities[targetKey].health -= 1;
+                        if (entities[targetKey].health <= 0) {
+                            Matter.World.remove(entities.physics.world, target);
+                            delete entities[targetKey];
+                            const effect = collisionEffects[target.label];
+                            gameStateRef.current.score += effect.score * (gameStateRef.current.isMultiplierActive ? 2 : 1);
+                            setters.setDisplayScore(gameStateRef.current.score); // Update UI
+                            playSound(effect.sound);
+                            if (effect.onDestroy) effect.onDestroy(target.position.x, target.position.y);
+                            if (target.label === 'mega') gameStateRef.current.megaSpawned = false;
 
-                    entities[targetKey].health -= 1;
-                    if (entities[targetKey].health <= 0) {
-                        Matter.World.remove(entities.physics.world, target);
-                        delete entities[targetKey];
-                        const effect = collisionEffects[target.label];
-                        gameStateRef.current.score += effect.score * (gameStateRef.current.isMultiplierActive ? 2 : 1);
-                        playSound(effect.sound);
-                        if (effect.onDestroy) effect.onDestroy(target.position.x, target.position.y);
-                        if (target.label === 'mega') gameStateRef.current.megaSpawned = false;
-
-                        const boom = Matter.Bodies.circle(target.position.x, target.position.y, 30, { isStatic: true, isSensor: true });
-                        Matter.World.add(entities.physics.world, boom);
-                        entities[`boom_${boom.id}`] = { body: boom, renderer: Boom, timeout: setTimeout(() => delete entities[`boom_${boom.id}`], 300) };
+                            const boom = Matter.Bodies.circle(target.position.x, target.position.y, 30, { isStatic: true, isSensor: true });
+                            Matter.World.add(entities.physics.world, boom);
+                            entities[`boom_${boom.id}`] = {
+                                body: boom, renderer: Boom, timeout: setTimeout(() => { Matter.World.remove(entities.physics.world, boom); delete entities[`boom_${boom.id}`] }, 300)
+                            };
+                        }
                     }
                 }
 
                 if (shipRef.current === bodyA || shipRef.current === bodyB) {
+                    pair.isProcessed = true;
                     if (coin) {
                         Matter.World.remove(entities.physics.world, coin);
                         delete entities[Object.keys(entities).find(key => entities[key].body === coin)];
                         playSound('coin');
                         gameStateRef.current.coins += 1;
+                        setters.setDisplayCoins(gameStateRef.current.coins); // Update UI
                     } else if (powerUp) {
                         const powerUpKey = Object.keys(entities).find(key => entities[key].body === powerUp);
                         Matter.World.remove(entities.physics.world, powerUp);
@@ -345,20 +391,24 @@ export const handleCollisions = (entities) => {
                         switch (powerUp.label) {
                             case 'megaBomb':
                                 gameStateRef.current.megaBombCount += 1;
+                                setters.setDisplayMegaBombCount(gameStateRef.current.megaBombCount);
                                 break;
                             case 'multiplier':
                                 gameStateRef.current.isMultiplierActive = true;
-                                gameStateRef.current.multiplierDuration = 10;
+                                gameStateRef.current.multiplierDuration = MULTIPLIER_DURATION;
+                                setters.setMultiplierDuration(MULTIPLIER_DURATION)
                                 break;
                             case 'shield':
                                 gameStateRef.current.isShieldActive = true;
-                                gameStateRef.current.shieldDuration = 10;
+                                gameStateRef.current.shieldDuration = SHIELD_DURATION;
+                                setters.setShieldDuration(SHIELD_DURATION)
                                 entities.spaceship.showShield = true;
                                 setTimeout(() => (entities.spaceship.showShield = false), 10000);
                                 break;
                             case 'coinMagnet':
                                 gameStateRef.current.isCoinMagnetActive = true;
-                                gameStateRef.current.coinMagnetDuration = 10;
+                                gameStateRef.current.coinMagnetDuration = MAGNET_DURATION;
+                                setters.setCoinMagnetDuration(MAGNET_DURATION)
                                 entities.spaceship.showMagnet = true;
                                 setTimeout(() => (entities.spaceship.showMagnet = false), 10000);
                                 break;
@@ -368,13 +418,49 @@ export const handleCollisions = (entities) => {
                         delete entities[Object.keys(entities).find(key => entities[key].body === enemyBullet)];
                         if (!gameStateRef.current.isShieldActive) {
                             gameStateRef.current.lives -= 1;
+                            setters.setDisplayLives(gameStateRef.current.lives); // Update UI
+                            setters.setShowBlinkingHeart(true)
                             playSound(gameStateRef.current.lives > 0 ? 'lifeLost' : 'gameOver');
                         }
-                    } else if (target && !gameStateRef.current.isShieldActive) {
+                    } else if (target) {
                         Matter.World.remove(entities.physics.world, target);
                         delete entities[Object.keys(entities).find(key => entities[key].body === target)];
-                        gameStateRef.current.lives -= target.label === 'mega' ? gameStateRef.current.lives : 1;
-                        playSound(gameStateRef.current.lives > 0 ? 'lifeLost' : 'gameOver');
+
+                        // Add boom effect at the collision point
+                        const boom = {
+                            body: Matter.Bodies.circle(target.position.x, target.position.y, 30, {
+                                isStatic: true,
+                                isSensor: true,
+                            }),
+                            renderer: Boom,
+                            timeout: setTimeout(() => {
+                                Matter.World.remove(entities.physics.world, boom.body);
+                                delete entities[`boom_${boom.body.id}`];
+                            }, 300), // Remove boom after 300ms
+                        };
+                        Matter.World.add(entities.physics.world, boom.body);
+                        entities[`boom_${boom.body.id}`] = boom;
+
+                        // Trigger blinking effect
+                        const shipEntity = entities.spaceship;
+                        if (shipEntity && shipRef.current) {
+                            shipEntity.isVisible = false;
+                        }
+                        setTimeout(() => {
+                            const shipEntity = entities.spaceship;
+                            if (shipEntity && shipRef.current) {
+                                shipEntity.isVisible = true;
+                            }
+                        }, 500); // 500ms blink
+
+                        if (!gameStateRef.current.isShieldActive) {
+                            gameStateRef.current.lives -= target.label === 'mega' ? gameStateRef.current.lives : 1;
+                            setters.setDisplayLives(gameStateRef.current.lives); // Update UI
+                            setters.setShowBlinkingHeart(true)
+                            playSound(gameStateRef.current.lives > 0 ? 'lifeLost' : 'gameOver');
+                        } else {
+                            playSound('pop');
+                        }
                     }
                 }
             });
@@ -387,52 +473,69 @@ export const handleCollisions = (entities) => {
 };
 
 export const CleanupEntities = (entities) => {
-    Object.keys(entities).forEach(key => {
-        const entity = entities[key];
-        if (entity.body && (entity.body.position.y < -50 || entity.body.position.y > height + 50)) {
-            Matter.World.remove(entities.physics.world, entity.body);
-            delete entities[key];
-            if (['megaBomb', 'multiplier', 'shield', 'coinMagnet'].includes(entity.body.label)) {
-                gameStateRef.current.isPowerUpActive = false;
+    try {
+        Object.keys(entities).forEach(key => {
+            const entity = entities[key];
+            if (entity.body && (entity.body.position.y < -50 || entity.body.position.y > height + 50)) {
+                Matter.World.remove(entities.physics.world, entity.body);
+                delete entities[key];
+                if (['megaBomb', 'multiplier', 'shield', 'coinMagnet'].includes(entity.body.label)) {
+                    gameStateRef.current.isPowerUpActive = false;
+                }
             }
-        }
-    });
-    return entities;
+        });
+        return entities;
+
+
+    } catch (e) {
+        console.log(e, 'cleanup error')
+    }
 };
 
 // Helper function for mega destruction
 const spawnAsteroids = (x, y, entities) => {
-    for (let i = 0; i < 4; i++) {
-        const asteroid = getAsteroidFromPool(x, y);
-        if (asteroid) {
-            Matter.Body.setVelocity(asteroid, { x: (Math.random() - 0.5) * 2, y: 5 });
-            Matter.World.add(entities.physics.world, asteroid);
-            entities[`asteroid_${asteroid.id}_${i}`] = {
-                body: asteroid,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                renderer: Asteroid,
-                health: 1,
-                enemyGenerate: asteroidImages[Math.floor(Math.random() * 8) + 1],
-            };
+    try {
+        for (let i = 0; i < 4; i++) {
+            const asteroid = getAsteroidFromPool(x, y);
+            if (asteroid) {
+                Matter.Body.setVelocity(asteroid, { x: (Math.random() - 0.5) * 2, y: 5 });
+                Matter.World.add(entities.physics.world, asteroid);
+                entities[`asteroid_${asteroid.id}_${i}`] = {
+                    body: asteroid,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    renderer: Asteroid,
+                    health: 1,
+                    enemyGenerate: asteroidImages[Math.floor(Math.random() * 8) + 1],
+                };
+            }
         }
+    } catch (e) {
+        console.log('asteroid', e)
     }
 };
 
 // In systems.js
-export const useMegaBomb = (entities) => {
-    if (gameStateRef.current.megaBombCount > 0) {
-        gameStateRef.current.megaBombCount -= 1;
-        Object.keys(entities).forEach(key => {
-            const entity = entities[key];
-            if (entity.body && ['asteroid', 'meteor', 'mega'].includes(entity.body.label)) {
-                Matter.World.remove(entities.physics.world, entity.body);
-                delete entities[key];
-            }
-        });
-        const explosion = createExplosion(width / 2, height / 2);
-        Matter.World.add(entities.physics.world, explosion);
-        entities[`explosion_${explosion.id}`] = { body: explosion, renderer: Explosion, timeout: setTimeout(() => delete entities[`explosion_${explosion.id}`], EXPLOSION_DURATION) };
-        playSound('explosion');
+export const useMegaBomb = () => {
+    try {
+        // Access entities from the ref
+        const entities = entitiesRef.current
+        if (gameStateRef.current.megaBombCount > 0) {
+            gameStateRef.current.megaBombCount -= 1;
+            Object.keys(entities).forEach(key => {
+                const entity = entities[key];
+                if (entity.body && ['asteroid', 'meteor', 'mega'].includes(entity.body.label)) {
+                    Matter.World.remove(entities.physics.world, entity.body);
+                    delete entities[key];
+                }
+            });
+            const explosion = createExplosion(width / 9, height / 3);
+            Matter.World.add(entities.physics.world, explosion);
+            entities[`explosion_${explosion.id}`] = { body: explosion, renderer: Explosion, timeout: setTimeout(() => delete entities[`explosion_${explosion.id}`], EXPLOSION_DURATION) };
+            Vibration.vibrate(100);
+            playSound('explosion');
+        }
+        return entities;
+    } catch (e) {
+        console.log(e, 'usemegabomb')
     }
-    return entities;
 };
