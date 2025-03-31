@@ -48,6 +48,8 @@ export default function GameScreen({ navigation }) {
         isPowerUpActive: false,
         bulletSpeed: 200,
         bulletCombo: 2,
+        magnetTimeoutId: null,
+        shieldTimeoutId: null
     });
 
     const [displayScore, setDisplayScore] = useState(0);
@@ -77,7 +79,7 @@ export default function GameScreen({ navigation }) {
                     whooshRef.current.play();
                 });
             }
-            initializeSounds();
+
             await resetGame();
             // Pass setters to systems.js
             initializeSystems(entitiesRef, gameStateRef, shipRef, {
@@ -153,6 +155,19 @@ export default function GameScreen({ navigation }) {
 
     // Reset game state
     const resetGame = async () => {
+        initializeSounds();
+        // Clear existing engine and event listeners
+        if (engineRef.current) {
+            Matter.Events.off(engineRef.current); // Remove all event listeners
+            Matter.Engine.clear(engineRef.current);
+        }
+
+        // Reinitialize engine and world
+        engineRef.current = Matter.Engine.create({ enableSleeping: true });
+        worldRef.current = engineRef.current.world;
+        shipRef.current = createShip();
+
+        // Reset physics world
         Matter.World.clear(worldRef.current, false);
         Matter.World.add(worldRef.current, shipRef.current);
 
@@ -184,6 +199,8 @@ export default function GameScreen({ navigation }) {
             isPowerUpActive: false,
             bulletSpeed: activeShip.bulletSpeed,
             bulletCombo: activeShip.bulletCombo,
+            magnetTimeoutId: null,
+            shieldTimeoutId: null
         };
 
         entitiesRef.current = {
@@ -217,14 +234,12 @@ export default function GameScreen({ navigation }) {
                 setGameOver(true);
                 setModalVisible(true);
             }, 300);
+            setTimeout(() => {
+                cleanupSounds()
+            }, 1500);
+            stopGame()
         }
-        // if (gameStateRef.current.score >= 10000 && !gameStateRef.current.levelUp) {
-        //     console.log('gamechange')
-        //     gameStateRef.current.levelUp = true;
-        // }
-        // if (gameStateRef.current.score >= 50000 && !gameStateRef.current.level3) {
-        //     gameStateRef.current.level3 = true;
-        // }
+
     }, [gameStateRef.current.lives, gameStateRef.current.score]);
 
     useEffect(() => {

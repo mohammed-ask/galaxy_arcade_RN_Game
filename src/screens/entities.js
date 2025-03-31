@@ -185,8 +185,8 @@ export const createExplosion = (x, y) => {
 
 // Reset entity to pool (called by CleanupEntities or collision handler)
 export const resetEntity = (entity) => {
-    if (entity.isActive) {
-        Matter.Body.setPosition(entity, { x: 0, y: 0 });
+    if (entity && entity.isActive) {
+        Matter.Body.setPosition(entity, { x: -100, y: -100 }); // Move off-screen, not (0, 0)
         Matter.Body.setVelocity(entity, { x: 0, y: 0 });
         entity.isActive = false;
     }

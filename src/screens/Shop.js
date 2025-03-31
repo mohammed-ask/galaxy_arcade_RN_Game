@@ -14,7 +14,7 @@ const Shop = ({ navigation }) => {
 
     useEffect(() => {
         (async () => {
-            // AsyncStorage.setItem('Coins', '1500')
+            // AsyncStorage.setItem('Coins', '15000')
         })()
         const backAction = () => {
             navigation.navigate('MainMenu')
@@ -211,13 +211,24 @@ const Shop = ({ navigation }) => {
 
                 {/* Right section: Upgrade Cost and Button */}
                 <View style={styles.powerUpActions}>
-                    <Text style={styles.powerUpCost}>{upgradeCost} Coins</Text>
-                    <TouchableScale
-                        style={styles.upgradeButton}
-                        onPress={() => upgradePowerUp(powerItem.name, upgradeCost)}
-                    >
-                        <Text style={styles.buttonText}>Upgrade</Text>
-                    </TouchableScale>
+                    {maxLevel === level ?
+                        <>
+                            <TouchableScale
+                                style={styles.upgradeButton}
+                            // onPress={() => upgradePowerUp(powerItem.name, upgradeCost)}
+                            >
+                                <Text style={styles.buttonText}>Maxed Level</Text>
+                            </TouchableScale>
+                        </>
+                        : <>
+                            <Text style={styles.powerUpCost}>{upgradeCost} Coins</Text>
+                            <TouchableScale
+                                style={styles.upgradeButton}
+                                onPress={() => upgradePowerUp(powerItem.name, upgradeCost)}
+                            >
+                                <Text style={styles.buttonText}>Upgrade</Text>
+                            </TouchableScale>
+                        </>}
                 </View>
             </View>
         );

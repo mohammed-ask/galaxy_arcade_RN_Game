@@ -4,10 +4,7 @@ import LinearGradient from 'react-native-linear-gradient';
 
 const TimerBar = ({ isMultiplierActive, multiplierProgress, range, top }) => {
     const progressAnim = useRef(new Animated.Value(0)).current;
-    console.log(top, isMultiplierActive, range)
-    // if (isMultiplierActive) {
-    //     console.log(range, isMultiplierActive, multiplierProgress, ' ranggg')
-    // }
+
     // Animate the progress bar when multiplierProgress changes
     useEffect(() => {
         Animated.timing(progressAnim, {

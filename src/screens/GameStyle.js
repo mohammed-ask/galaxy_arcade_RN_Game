@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 const styles = StyleSheet.create({
     containerImg: { flex: 1, zIndex: 2 },
     container: { flex: 1 },
-    score: { position: 'absolute', top: 40, left: 20, color: 'white', fontSize: 24, fontFamily: 'Audiowide-Regular' },
+    score: { color: 'white', fontSize: 24, fontFamily: 'Audiowide-Regular' },
     lives: { position: 'absolute', top: 80, left: 20, color: 'white', fontSize: 24, fontWeight: 'bold', flexDirection: 'row' },
     // coins: { position: 'absolute', top: 40, right: 20, color: 'white', fontSize: 24, fontWeight: 'bold' },
     modalContainer: {
@@ -48,6 +48,9 @@ const styles = StyleSheet.create({
     coin: {
         width: 20, // Adjust based on image size
         height: 20,
+    },
+    coinText: {
+        fontFamily: 'Audiowide-Regular',
     },
     timer: {
         position: 'absolute',

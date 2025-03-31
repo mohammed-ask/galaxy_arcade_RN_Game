@@ -1,4 +1,4 @@
-package com.hopper
+package com.galaxyarcade
 
 import android.app.Application
 import com.facebook.react.PackageList

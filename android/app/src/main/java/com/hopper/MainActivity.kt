@@ -1,4 +1,4 @@
-package com.hopper
+package com.galaxyarcade
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

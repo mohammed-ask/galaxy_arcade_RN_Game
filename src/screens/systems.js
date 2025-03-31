@@ -1,7 +1,7 @@
 import Matter from 'matter-js';
 import { Dimensions, Vibration } from 'react-native';
 import { playSound } from './utils';
-import { getBulletFromPool, getAsteroidFromPool, getCoinFromPool, createExplosion, getBullet2FromPool } from './entities'; // Assuming entity pooling
+import { getBulletFromPool, getAsteroidFromPool, getCoinFromPool, createExplosion, getBullet2FromPool, resetEntity } from './entities'; // Assuming entity pooling
 import { shipSize, colors, asteroidImages, MULTIPLIER_DURATION, SHIELD_DURATION, MAGNET_DURATION, EXPLOSION_DURATION } from './constants';
 import Bullet from '../assets/Bullets';
 import Asteroid from '../assets/Ufo';
@@ -403,14 +403,20 @@ export const handleCollisions = (entities) => {
                                 gameStateRef.current.shieldDuration = SHIELD_DURATION;
                                 setters.setShieldDuration(SHIELD_DURATION)
                                 entities.spaceship.showShield = true;
-                                setTimeout(() => (entities.spaceship.showShield = false), 10000);
+                                if (!isEmpty(gameStateRef.current.shieldTimeoutId)) {
+                                    clearInterval(gameStateRef.current.shieldTimeoutId)
+                                }
+                                gameStateRef.current.shieldTimeoutId = setTimeout(() => (entities.spaceship.showShield = false), SHIELD_DURATION * 1000);
                                 break;
                             case 'coinMagnet':
                                 gameStateRef.current.isCoinMagnetActive = true;
                                 gameStateRef.current.coinMagnetDuration = MAGNET_DURATION;
                                 setters.setCoinMagnetDuration(MAGNET_DURATION)
                                 entities.spaceship.showMagnet = true;
-                                setTimeout(() => (entities.spaceship.showMagnet = false), 10000);
+                                if (!isEmpty(gameStateRef.current.magnetTimeoutId)) {
+                                    clearInterval(gameStateRef.current.magnetTimeoutId)
+                                }
+                                gameStateRef.current.magnetTimeoutId = setTimeout(() => (entities.spaceship.showMagnet = false), MAGNET_DURATION * 1000);
                                 break;
                         }
                     } else if (enemyBullet) {
@@ -472,18 +478,44 @@ export const handleCollisions = (entities) => {
     }
 };
 
+let timer
 export const CleanupEntities = (entities) => {
     try {
+        if (!entities || !entities.physics || !entities.physics.world) {
+            console.warn('CleanupEntities: entities or entities.physics is undefined');
+            return entities || entitiesRef.current || {};
+        }
+
+        // console.log('CleanupEntities - Entity count before:', Object.keys(entities).length);
+
         Object.keys(entities).forEach(key => {
             const entity = entities[key];
-            if (entity.body && (entity.body.position.y < -50 || entity.body.position.y > height + 50)) {
-                Matter.World.remove(entities.physics.world, entity.body);
-                delete entities[key];
-                if (['megaBomb', 'multiplier', 'shield', 'coinMagnet'].includes(entity.body.label)) {
-                    gameStateRef.current.isPowerUpActive = false;
+            if (!entity?.body) return;
+
+            const isPooled = ['bullet', 'asteroid', 'coin'].includes(entity.body.label);
+            const isOffScreen = entity.body.position.y < -50 || entity.body.position.y > height + 50;
+
+            if (isOffScreen) {
+                if (false && isPooled) {
+                    if (entity.body.isActive) {
+                        clearTimeout(timer)
+                        timer = setTimeout(() => {
+                            resetEntity(entity.body);
+                        }, 300);
+                        console.log(`Reset pooled entity: ${key} (${entity.body.label})`);
+                    }
+                    // Do nothing else for pooled entities—keep them in entities
+                } else {
+                    // Remove non-pooled entities (e.g., booms, explosions)
+                    Matter.World.remove(entities.physics.world, entity.body);
+                    if (entity.timeout) clearTimeout(entity.timeout);
+                    delete entities[key];
+                    // console.log(`Removed non-pooled entity: ${key}`);
                 }
             }
         });
+
+        // console.log('CleanupEntities - Entity count after:', Object.keys(entities).length);
         return entities;
 
 

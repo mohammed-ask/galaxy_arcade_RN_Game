@@ -244,7 +244,7 @@ const MainMenuScreen = () => {
         <TouchableScale style={styles.button} onPress={() => handleNavigation('Shop', true)}>
           <Text style={styles.buttonText}>Shop</Text>
         </TouchableScale>
-        <TouchableScale style={styles.button} onPress={() => handleNavigation('Leaderboard')}>
+        <TouchableScale style={styles.button} onPress={() => handleNavigation('LeaderBoard', true)}>
           <Text style={styles.buttonText}>Leaderboard</Text>
         </TouchableScale>
         <TouchableScale style={styles.button} onPress={() => handleNavigation('Settings', true)}>
