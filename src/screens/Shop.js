@@ -235,7 +235,7 @@ const Shop = ({ navigation }) => {
     }
 
     return (
-        <ImageBackground source={require('../assets/imgaes/background2.jpg')} style={styles.background}>
+        <ImageBackground source={require('../assets/imgaes/background3.jpg')} style={styles.background}>
             <BlurView style={{ width: '100%', flex: 1 }} blurType="light" blurAmount={1} overlayColor='rgba(0,0,0,0.1)'>
                 <View style={styles.containerInner}>
                     {/* Title */}

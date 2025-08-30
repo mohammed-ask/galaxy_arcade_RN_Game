@@ -29,7 +29,7 @@ const SplashScreen = ({ navigation }) => {
     }, [navigation, rocketY]);
 
     return (
-        <ImageBackground source={require('../assets/imgaes/background2.jpg')} style={styles.container}>
+        <ImageBackground source={require('../assets/imgaes/background3.jpg')} style={styles.container}>
             <Animated.Image
                 source={require('../assets/imgaes/spaceship.png')}
                 style={{

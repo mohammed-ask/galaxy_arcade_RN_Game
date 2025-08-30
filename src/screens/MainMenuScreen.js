@@ -230,7 +230,7 @@ const MainMenuScreen = () => {
   }
 
   return (
-    <ImageBackground source={require('../assets/imgaes/background2.jpg')} style={styles.background}>
+    <ImageBackground source={require('../assets/imgaes/background3.jpg')} style={styles.background}>
       <View style={styles.container}>
         <View style={{ marginHorizontal: 15, paddingVertical: 5, borderRadius: 30, borderWidth: 5, borderColor: '#000', width: 100, backgroundColor: '#6200EE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
           <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />

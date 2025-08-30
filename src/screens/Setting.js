@@ -54,7 +54,7 @@ const Settings = ({ navigation }) => {
     };
 
     return (
-        <ImageBackground source={require('../assets/imgaes/background2.jpg')} style={styles.container}>
+        <ImageBackground source={require('../assets/imgaes/background3.jpg')} style={styles.container}>
             <View style={styles.containerInner}>
                 {/* Title */}
                 <Text style={styles.title}>Settings</Text>

@@ -16,11 +16,11 @@ import Animated, {
 
 const LeaderboardScreen = ({ navigation }) => {
     const data = [
-        { name: "Rashmi", score: 1080 },
-        { name: "Mustufa Taher", score: 1100 },
-        { name: "Parag Chahal", score: 1500 },
-        { name: "Mahesh Raj", score: 1260 },
-        { name: "Fateh Mohammad", score: 1600 },
+        { name: "Mike", score: 1080 },
+        { name: "John", score: 1100 },
+        { name: "Samuel", score: 1500 },
+        { name: "Karen", score: 1260 },
+        { name: "Yuki", score: 1600 },
     ];
 
     useEffect(() => {
@@ -78,7 +78,7 @@ const LeaderboardScreen = ({ navigation }) => {
     );
 
     return (
-        <ImageBackground source={require('../assets/imgaes/background2.jpg')} style={styles.container}>
+        <ImageBackground source={require('../assets/imgaes/background3.jpg')} style={styles.container}>
             <StatusBar barStyle="light-content" />
             <BlurView style={{ width: '100%', flex: 1 }} blurType="light" blurAmount={1} overlayColor='rgba(0,0,0,0.1)'>
                 <View style={styles.containerInner}>

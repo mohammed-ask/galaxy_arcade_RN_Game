@@ -46,6 +46,7 @@ export default function GameScreen({ navigation }) {
         isMultiplierActive: false,
         multiplierDuration: 0,
         isPowerUpActive: false,
+        isCoinsActive: false,
         bulletSpeed: 200,
         bulletCombo: 2,
         magnetTimeoutId: null,
@@ -197,6 +198,7 @@ export default function GameScreen({ navigation }) {
             isMultiplierActive: false,
             multiplierDuration: 0,
             isPowerUpActive: false,
+            isCoinsActive: false,
             bulletSpeed: activeShip.bulletSpeed,
             bulletCombo: activeShip.bulletCombo,
             magnetTimeoutId: null,
@@ -315,6 +317,19 @@ export default function GameScreen({ navigation }) {
         // }
     };
 
+    const Profiler = (entities, { time }) => {
+        const start = performance.now();
+        // store start time in global or ref for comparison later
+        if (!global.lastFrameStart) {
+            global.lastFrameStart = start;
+        } else {
+            const frameTime = start - global.lastFrameStart;
+            console.log(`Frame duration: ${frameTime.toFixed(2)} ms`);
+            global.lastFrameStart = start;
+        }
+        return entities;
+    };
+
     const systems = [
         Physics,
         TimerSystem,
@@ -330,10 +345,11 @@ export default function GameScreen({ navigation }) {
         CoinMagnetSpawner,
         handleCollisions,
         CleanupEntities,
+        // Profiler,
     ];
 
     return (
-        <ImageBackground source={require('../assets/imgaes/background2.jpg')} resizeMode="cover" style={styles.containerImg}>
+        <ImageBackground source={require('../assets/imgaes/background3.jpg')} resizeMode="cover" style={styles.containerImg}>
             <GameEngine
                 ref={gameEngine}
                 style={styles.container}
