@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
+import { gifAssets } from '../screens/constants';
 
 const CoinMagnet = ({ body }) => {
     return (
-        <Image source={require('../assets/imgaes/magnet.gif')} style={{ position: 'absolute', left: body.position.x, top: body.position.y, height: 60, width: 60 }} />
+        <Image source={gifAssets[8]} style={{ position: 'absolute', left: body.position.x, top: body.position.y, height: 60, width: 60 }} />
     );
 };
 

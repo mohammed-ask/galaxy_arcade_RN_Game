@@ -1,4 +1,5 @@
-import { Dimensions } from 'react-native';
+import { Dimensions, Image } from 'react-native';
+import FastImage from 'react-native-fast-image';
 
 // Screen dimensions
 export const { width, height } = Dimensions.get('screen');
@@ -26,6 +27,57 @@ export const asteroidImages = {
     6: require('../assets/imgaes/asteroid6.png'),
     7: require('../assets/imgaes/asteroid7.png'),
     8: require('../assets/imgaes/asteroid8.png'),
+};
+
+export const images = [
+    require('../assets/imgaes/asteroid1.png'),
+    require('../assets/imgaes/asteroid2.png'),
+    require('../assets/imgaes/asteroid3.png'),
+    require('../assets/imgaes/asteroid4.png'),
+    require('../assets/imgaes/asteroid5.png'),
+    require('../assets/imgaes/asteroid6.png'),
+    require('../assets/imgaes/asteroid7.png'),
+    require('../assets/imgaes/asteroid8.png'),
+    require('../assets/imgaes/mega.png'),
+    require('../assets/imgaes/heart.png'),
+    require('../assets/imgaes/bullet1.png'),
+]
+
+export const gifAssets = [
+    require('../assets/imgaes/explosion.gif'),
+    require('../assets/imgaes/shipshield.gif'),
+    require('../assets/imgaes/magnetism.gif'),
+    require('../assets/imgaes/star.gif'),
+    require('../assets/imgaes/bombstatic.png'),
+    require('../assets/imgaes/boom.gif'),
+    require('../assets/imgaes/enemyshield.gif'),
+    require('../assets/imgaes/goldcoinstatic.png'),
+    require('../assets/imgaes/magnet.gif'),
+    require('../assets/imgaes/shielded.gif'),
+]
+
+export const preloadImages = async () => {
+    const promises = images.map(img => Image.prefetch(Image.resolveAssetSource(img).uri));
+    await Promise.all(promises);
+    console.log("✅ All images preloaded");
+};
+
+export const preloadGifs = async () => {
+    const promises = gifAssets.map(img =>
+        FastImage.preload([{ uri: Image.resolveAssetSource(img).uri }])
+    );
+    await Promise.all(promises);
+    console.log("✅ All GIFs preloaded");
+};
+
+export const preloadAssets = async () => {
+    try {
+        await preloadImages();
+        await preloadGifs();
+        console.log("🎉 All assets ready before game start!");
+    } catch (e) {
+        console.warn("Asset preload failed:", e);
+    }
 };
 
 // Spaceship icons (assuming these are defined in your utils/index.js)

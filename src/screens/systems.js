@@ -21,6 +21,7 @@ let entitiesRef = null;
 let gameStateRef = null;
 let shipRef = null;
 let setters = {}; // Store setters from GameScreen
+let collisionRegistered = false;
 
 // Initialize references (call this from GameScreen)
 export const initializeSystems = (entities, gameState, ship, stateSetters) => {
@@ -32,22 +33,44 @@ export const initializeSystems = (entities, gameState, ship, stateSetters) => {
 
 // Fixed time step for physics
 const FIXED_TIME_STEP = 1000 / 60;
+const MAX_STEPS = 5; // cap to at most 5 physics updates per frame
 let accumulator = 0;
+
+// export const Physics = (entities, { time }) => {
+//     try {
+//         // console.log(entities, 'entitit')
+//         accumulator += time.delta;
+//         while (accumulator >= FIXED_TIME_STEP) {
+//             Matter.Engine.update(entities.physics.engine, FIXED_TIME_STEP);
+//             accumulator -= FIXED_TIME_STEP;
+//         }
+//         entitiesRef.current = entities; // Update ref for other systems
+//         // Log entity and physics body counts
+//         // console.log('Physics - Entity count:', Object.keys(entities).length, 'Physics bodies:', Matter.Composite.allBodies(entities.physics.world).length);
+//         return entities;
+//     } catch (e) {
+//         console.log('physics error', e)
+//     }
+// };
 
 export const Physics = (entities, { time }) => {
     try {
-        // console.log(entities, 'entitit')
         accumulator += time.delta;
-        while (accumulator >= FIXED_TIME_STEP) {
+        let numSteps = 0;
+
+        while (accumulator >= FIXED_TIME_STEP && numSteps < MAX_STEPS) {
             Matter.Engine.update(entities.physics.engine, FIXED_TIME_STEP);
             accumulator -= FIXED_TIME_STEP;
+            numSteps++;
         }
-        entitiesRef.current = entities; // Update ref for other systems
-        // Log entity and physics body counts
-        // console.log('Physics - Entity count:', Object.keys(entities).length, 'Physics bodies:', Matter.Composite.allBodies(entities.physics.world).length);
+
+        // If still leftover after MAX_STEPS, just drop it (prevents spiral of death)
+        accumulator = Math.min(accumulator, FIXED_TIME_STEP);
+
+        entitiesRef.current = entities;
         return entities;
     } catch (e) {
-        console.log('physics error', e)
+        console.log('physics error', e);
     }
 };
 
@@ -114,22 +137,22 @@ export const BulletShooter = (entities, { time }) => {
             bulletCooldown = 0;
             playSound('laser', 10000);
 
-            const isLevelUp = gameStateRef.current.score >= 200;
-            if (!isLevelUp) {
-                const bullet = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
-                Matter.World.add(entities.physics.world, bullet);
-                entities[`bullet_${bullet.id}`] = { body: bullet, color: 'yellow', renderer: Bullet };
-            }
-            if (isLevelUp) { // Assuming levelUp is tracked in gameStateRef
-                const bullet2 = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
-                const bullet3 = getBulletFromPool(shipRef.current.position.x + 10, shipRef.current.position.y - 30);
-                if (bullet2 && bullet3) {
-                    Matter.World.add(entities.physics.world, bullet2);
-                    Matter.World.add(entities.physics.world, bullet3);
-                    entities[`bullet_${bullet2.id}_${Date.now()}_1`] = { body: bullet2, color: 'yellow', renderer: Bullet };
-                    entities[`bullet_${bullet3.id}_${Date.now()}_2`] = { body: bullet3, color: 'yellow', renderer: Bullet };
-                }
-            }
+            // const isLevelUp = gameStateRef.current.score >= 200000;
+            // if (!isLevelUp) {
+            const bullet = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
+            Matter.World.add(entities.physics.world, bullet);
+            entities[`bullet_${bullet.id}`] = { body: bullet, color: 'yellow', renderer: Bullet };
+            // }
+            // if (isLevelUp) { // Assuming levelUp is tracked in gameStateRef
+            //     const bullet2 = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
+            //     const bullet3 = getBulletFromPool(shipRef.current.position.x + 10, shipRef.current.position.y - 30);
+            //     if (bullet2 && bullet3) {
+            //         Matter.World.add(entities.physics.world, bullet2);
+            //         Matter.World.add(entities.physics.world, bullet3);
+            //         entities[`bullet_${bullet2.id}_${Date.now()}_1`] = { body: bullet2, color: 'yellow', renderer: Bullet };
+            //         entities[`bullet_${bullet3.id}_${Date.now()}_2`] = { body: bullet3, color: 'yellow', renderer: Bullet };
+            //     }
+            // }
         }
         return entities;
     } catch (e) {
@@ -212,7 +235,7 @@ let coinCooldown = 0;
 export const CoinSpawner = (entities, { time }) => {
     try {
         coinCooldown += time.delta;
-        if (coinCooldown > 1000 && Math.random() < 0.002) {
+        if (!gameStateRef.current.isCoinsActive && coinCooldown > 1000 && Math.random() < 0.002) {
             coinCooldown = 0;
             const pattern = Math.floor(Math.random() * 3);
             const numCoins = 5;
@@ -244,6 +267,7 @@ export const CoinSpawner = (entities, { time }) => {
                     entities[`coin_${coin.id}_${i}`] = { body: coin, renderer: Coin };
                 }
             }
+            gameStateRef.current.isCoinsActive = true;
         }
         return entities;
     } catch (e) {
@@ -332,146 +356,148 @@ export const handleCollisions = (entities) => {
         const collisionEffects = {
             asteroid: { score: 10, sound: 'pop', onDestroy: null },
             meteor: { score: 20, sound: 'bossPop', onDestroy: null },
-            mega: { score: 50, sound: 'bossPop', onDestroy: (x, y) => spawnAsteroids(x, y, entities) },
+            mega: { score: 50, sound: 'bossPop', onDestroy: null },
         };
+        if (!collisionRegistered) {
+            Matter.Events.on(entities.physics.engine, 'collisionStart', (event) => {
+                event.pairs.forEach(pair => {
+                    if (pair.isProcessed) return;
 
-        Matter.Events.on(entities.physics.engine, 'collisionStart', (event) => {
-            event.pairs.forEach(pair => {
-                if (pair.isProcessed) return;
 
+                    const [bodyA, bodyB] = [pair.bodyA, pair.bodyB];
+                    const bullet = bodyA.label === 'bullet' ? bodyA : bodyB.label === 'bullet' ? bodyB : null;
+                    const enemyBullet = bodyA.label === 'enemyBullet' ? bodyA : bodyB.label === 'enemyBullet' ? bodyB : null;
+                    const target = collisionEffects[bodyA.label] ? bodyA : collisionEffects[bodyB.label] ? bodyB : null;
+                    const coin = bodyA.label === 'coin' ? bodyA : bodyB.label === 'coin' ? bodyB : null;
+                    const powerUp = ['megaBomb', 'multiplier', 'shield', 'coinMagnet'].includes(bodyA.label) ? bodyA : ['megaBomb', 'multiplier', 'shield', 'coinMagnet'].includes(bodyB.label) ? bodyB : null;
 
-                const [bodyA, bodyB] = [pair.bodyA, pair.bodyB];
-                const bullet = bodyA.label === 'bullet' ? bodyA : bodyB.label === 'bullet' ? bodyB : null;
-                const enemyBullet = bodyA.label === 'enemyBullet' ? bodyA : bodyB.label === 'enemyBullet' ? bodyB : null;
-                const target = collisionEffects[bodyA.label] ? bodyA : collisionEffects[bodyB.label] ? bodyB : null;
-                const coin = bodyA.label === 'coin' ? bodyA : bodyB.label === 'coin' ? bodyB : null;
-                const powerUp = ['megaBomb', 'multiplier', 'shield', 'coinMagnet'].includes(bodyA.label) ? bodyA : ['megaBomb', 'multiplier', 'shield', 'coinMagnet'].includes(bodyB.label) ? bodyB : null;
+                    if (bullet && target) {
+                        pair.isProcessed = true;
+                        const targetKey = Object.keys(entities).find(key => entities[key].body === target);
+                        Matter.World.remove(entities.physics.world, bullet);
+                        delete entities[Object.keys(entities).find(key => entities[key].body === bullet)];
+                        if (!isEmpty(entities[targetKey])) {
+                            entities[targetKey].health -= 1;
+                            if (entities[targetKey].health <= 0) {
+                                Matter.World.remove(entities.physics.world, target);
+                                delete entities[targetKey];
+                                const effect = collisionEffects[target.label];
+                                gameStateRef.current.score += effect.score * (gameStateRef.current.isMultiplierActive ? 2 : 1);
+                                setters.setDisplayScore(gameStateRef.current.score); // Update UI
+                                playSound(effect.sound);
+                                if (effect.onDestroy) effect.onDestroy(target.position.x, target.position.y);
+                                // if (target.label === 'mega') gameStateRef.current.megaSpawned = false;
 
-                if (bullet && target) {
-                    pair.isProcessed = true;
-                    const targetKey = Object.keys(entities).find(key => entities[key].body === target);
-                    Matter.World.remove(entities.physics.world, bullet);
-                    delete entities[Object.keys(entities).find(key => entities[key].body === bullet)];
-                    if (!isEmpty(entities[targetKey])) {
-                        entities[targetKey].health -= 1;
-                        if (entities[targetKey].health <= 0) {
-                            Matter.World.remove(entities.physics.world, target);
-                            delete entities[targetKey];
-                            const effect = collisionEffects[target.label];
-                            gameStateRef.current.score += effect.score * (gameStateRef.current.isMultiplierActive ? 2 : 1);
-                            setters.setDisplayScore(gameStateRef.current.score); // Update UI
-                            playSound(effect.sound);
-                            if (effect.onDestroy) effect.onDestroy(target.position.x, target.position.y);
-                            if (target.label === 'mega') gameStateRef.current.megaSpawned = false;
-
-                            const boom = Matter.Bodies.circle(target.position.x, target.position.y, 30, { isStatic: true, isSensor: true });
-                            Matter.World.add(entities.physics.world, boom);
-                            entities[`boom_${boom.id}`] = {
-                                body: boom, renderer: Boom, timeout: setTimeout(() => { Matter.World.remove(entities.physics.world, boom); delete entities[`boom_${boom.id}`] }, 300)
-                            };
+                                const boom = Matter.Bodies.circle(target.position.x, target.position.y, 30, { isStatic: true, isSensor: true });
+                                Matter.World.add(entities.physics.world, boom);
+                                entities[`boom_${boom.id}`] = {
+                                    body: boom, renderer: Boom, timeout: setTimeout(() => { Matter.World.remove(entities.physics.world, boom); delete entities[`boom_${boom.id}`] }, 300)
+                                };
+                            }
                         }
                     }
-                }
 
-                if (shipRef.current === bodyA || shipRef.current === bodyB) {
-                    pair.isProcessed = true;
-                    if (coin) {
-                        Matter.World.remove(entities.physics.world, coin);
-                        delete entities[Object.keys(entities).find(key => entities[key].body === coin)];
-                        playSound('coin');
-                        gameStateRef.current.coins += 1;
-                        setters.setDisplayCoins(gameStateRef.current.coins); // Update UI
-                    } else if (powerUp) {
-                        const powerUpKey = Object.keys(entities).find(key => entities[key].body === powerUp);
-                        Matter.World.remove(entities.physics.world, powerUp);
-                        delete entities[powerUpKey];
-                        playSound('powercollection');
-                        gameStateRef.current.isPowerUpActive = false;
+                    if (shipRef.current === bodyA || shipRef.current === bodyB) {
+                        pair.isProcessed = true;
+                        if (coin) {
+                            Matter.World.remove(entities.physics.world, coin);
+                            delete entities[Object.keys(entities).find(key => entities[key].body === coin)];
+                            playSound('coin');
+                            gameStateRef.current.isCoinsActive = false;
+                            gameStateRef.current.coins += 1;
+                            setters.setDisplayCoins(gameStateRef.current.coins); // Update UI
+                        } else if (powerUp) {
+                            const powerUpKey = Object.keys(entities).find(key => entities[key].body === powerUp);
+                            Matter.World.remove(entities.physics.world, powerUp);
+                            delete entities[powerUpKey];
+                            playSound('powercollection');
+                            gameStateRef.current.isPowerUpActive = false;
 
-                        switch (powerUp.label) {
-                            case 'megaBomb':
-                                gameStateRef.current.megaBombCount += 1;
-                                setters.setDisplayMegaBombCount(gameStateRef.current.megaBombCount);
-                                break;
-                            case 'multiplier':
-                                gameStateRef.current.isMultiplierActive = true;
-                                gameStateRef.current.multiplierDuration = MULTIPLIER_DURATION;
-                                setters.setMultiplierDuration(MULTIPLIER_DURATION)
-                                break;
-                            case 'shield':
-                                gameStateRef.current.isShieldActive = true;
-                                gameStateRef.current.shieldDuration = SHIELD_DURATION;
-                                setters.setShieldDuration(SHIELD_DURATION)
-                                entities.spaceship.showShield = true;
-                                if (!isEmpty(gameStateRef.current.shieldTimeoutId)) {
-                                    clearInterval(gameStateRef.current.shieldTimeoutId)
-                                }
-                                gameStateRef.current.shieldTimeoutId = setTimeout(() => (entities.spaceship.showShield = false), SHIELD_DURATION * 1000);
-                                break;
-                            case 'coinMagnet':
-                                gameStateRef.current.isCoinMagnetActive = true;
-                                gameStateRef.current.coinMagnetDuration = MAGNET_DURATION;
-                                setters.setCoinMagnetDuration(MAGNET_DURATION)
-                                entities.spaceship.showMagnet = true;
-                                if (!isEmpty(gameStateRef.current.magnetTimeoutId)) {
-                                    clearInterval(gameStateRef.current.magnetTimeoutId)
-                                }
-                                gameStateRef.current.magnetTimeoutId = setTimeout(() => (entities.spaceship.showMagnet = false), MAGNET_DURATION * 1000);
-                                break;
-                        }
-                    } else if (enemyBullet) {
-                        Matter.World.remove(entities.physics.world, enemyBullet);
-                        delete entities[Object.keys(entities).find(key => entities[key].body === enemyBullet)];
-                        if (!gameStateRef.current.isShieldActive) {
-                            gameStateRef.current.lives -= 1;
-                            setters.setDisplayLives(gameStateRef.current.lives); // Update UI
-                            setters.setShowBlinkingHeart(true)
-                            playSound(gameStateRef.current.lives > 0 ? 'lifeLost' : 'gameOver');
-                        }
-                    } else if (target) {
-                        Matter.World.remove(entities.physics.world, target);
-                        delete entities[Object.keys(entities).find(key => entities[key].body === target)];
+                            switch (powerUp.label) {
+                                case 'megaBomb':
+                                    gameStateRef.current.megaBombCount += 1;
+                                    setters.setDisplayMegaBombCount(gameStateRef.current.megaBombCount);
+                                    break;
+                                case 'multiplier':
+                                    gameStateRef.current.isMultiplierActive = true;
+                                    gameStateRef.current.multiplierDuration = MULTIPLIER_DURATION;
+                                    setters.setMultiplierDuration(MULTIPLIER_DURATION)
+                                    break;
+                                case 'shield':
+                                    gameStateRef.current.isShieldActive = true;
+                                    gameStateRef.current.shieldDuration = SHIELD_DURATION;
+                                    setters.setShieldDuration(SHIELD_DURATION)
+                                    entities.spaceship.showShield = true;
+                                    if (!isEmpty(gameStateRef.current.shieldTimeoutId)) {
+                                        clearInterval(gameStateRef.current.shieldTimeoutId)
+                                    }
+                                    gameStateRef.current.shieldTimeoutId = setTimeout(() => (entities.spaceship.showShield = false), SHIELD_DURATION * 1000);
+                                    break;
+                                case 'coinMagnet':
+                                    gameStateRef.current.isCoinMagnetActive = true;
+                                    gameStateRef.current.coinMagnetDuration = MAGNET_DURATION;
+                                    setters.setCoinMagnetDuration(MAGNET_DURATION)
+                                    entities.spaceship.showMagnet = true;
+                                    if (!isEmpty(gameStateRef.current.magnetTimeoutId)) {
+                                        clearInterval(gameStateRef.current.magnetTimeoutId)
+                                    }
+                                    gameStateRef.current.magnetTimeoutId = setTimeout(() => (entities.spaceship.showMagnet = false), MAGNET_DURATION * 1000);
+                                    break;
+                            }
+                        } else if (enemyBullet) {
+                            Matter.World.remove(entities.physics.world, enemyBullet);
+                            delete entities[Object.keys(entities).find(key => entities[key].body === enemyBullet)];
+                            if (!gameStateRef.current.isShieldActive) {
+                                gameStateRef.current.lives -= 1;
+                                setters.setDisplayLives(gameStateRef.current.lives); // Update UI
+                                setters.setShowBlinkingHeart(true)
+                                playSound(gameStateRef.current.lives > 0 ? 'lifeLost' : 'gameOver');
+                            }
+                        } else if (target) {
+                            Matter.World.remove(entities.physics.world, target);
+                            delete entities[Object.keys(entities).find(key => entities[key].body === target)];
 
-                        // Add boom effect at the collision point
-                        const boom = {
-                            body: Matter.Bodies.circle(target.position.x, target.position.y, 30, {
-                                isStatic: true,
-                                isSensor: true,
-                            }),
-                            renderer: Boom,
-                            timeout: setTimeout(() => {
-                                Matter.World.remove(entities.physics.world, boom.body);
-                                delete entities[`boom_${boom.body.id}`];
-                            }, 300), // Remove boom after 300ms
-                        };
-                        Matter.World.add(entities.physics.world, boom.body);
-                        entities[`boom_${boom.body.id}`] = boom;
+                            // Add boom effect at the collision point
+                            const boom = {
+                                body: Matter.Bodies.circle(target.position.x, target.position.y, 30, {
+                                    isStatic: true,
+                                    isSensor: true,
+                                }),
+                                renderer: Boom,
+                                timeout: setTimeout(() => {
+                                    Matter.World.remove(entities.physics.world, boom.body);
+                                    delete entities[`boom_${boom.body.id}`];
+                                }, 300), // Remove boom after 300ms
+                            };
+                            Matter.World.add(entities.physics.world, boom.body);
+                            entities[`boom_${boom.body.id}`] = boom;
 
-                        // Trigger blinking effect
-                        const shipEntity = entities.spaceship;
-                        if (shipEntity && shipRef.current) {
-                            shipEntity.isVisible = false;
-                        }
-                        setTimeout(() => {
+                            // Trigger blinking effect
                             const shipEntity = entities.spaceship;
                             if (shipEntity && shipRef.current) {
-                                shipEntity.isVisible = true;
+                                shipEntity.isVisible = false;
                             }
-                        }, 500); // 500ms blink
+                            setTimeout(() => {
+                                const shipEntity = entities.spaceship;
+                                if (shipEntity && shipRef.current) {
+                                    shipEntity.isVisible = true;
+                                }
+                            }, 500); // 500ms blink
 
-                        if (!gameStateRef.current.isShieldActive) {
-                            gameStateRef.current.lives -= target.label === 'mega' ? gameStateRef.current.lives : 1;
-                            setters.setDisplayLives(gameStateRef.current.lives); // Update UI
-                            setters.setShowBlinkingHeart(true)
-                            playSound(gameStateRef.current.lives > 0 ? 'lifeLost' : 'gameOver');
-                        } else {
-                            playSound('pop');
+                            if (!gameStateRef.current.isShieldActive) {
+                                gameStateRef.current.lives -= target.label === 'mega' ? gameStateRef.current.lives : 1;
+                                setters.setDisplayLives(gameStateRef.current.lives); // Update UI
+                                setters.setShowBlinkingHeart(true)
+                                playSound(gameStateRef.current.lives > 0 ? 'lifeLost' : 'gameOver');
+                            } else {
+                                playSound('pop');
+                            }
                         }
                     }
-                }
+                });
             });
-        });
-
+            collisionRegistered = true;
+        }
         return entities;
     } catch (e) {
         console.log('handlicollision', e)
@@ -486,7 +512,12 @@ export const CleanupEntities = (entities) => {
             return entities || entitiesRef.current || {};
         }
 
-        // console.log('CleanupEntities - Entity count before:', Object.keys(entities).length);
+        // console.log(
+        //     "Entities:", Object.keys(entities).length,
+        //     "Bodies:", entities.physics.world.bodies.length,
+        //     "Constraints:", entities.physics.world.constraints.length,
+        //     "Active Timers:", global.nativeTimers
+        // );
 
         Object.keys(entities).forEach(key => {
             const entity = entities[key];
@@ -510,6 +541,13 @@ export const CleanupEntities = (entities) => {
                     Matter.World.remove(entities.physics.world, entity.body);
                     if (entity.timeout) clearTimeout(entity.timeout);
                     delete entities[key];
+
+                    if (entity.body.label === 'megaBomb' || entity.body.label === 'multiplier' || entity.body.label === 'coinMagnet' || entity.body.label === 'shield') {
+                        gameStateRef.current.isPowerUpActive = false
+                    }
+                    if (entity.body.label === 'coin') {
+                        gameStateRef.current.isCoinsActive = false
+                    }
                     // console.log(`Removed non-pooled entity: ${key}`);
                 }
             }

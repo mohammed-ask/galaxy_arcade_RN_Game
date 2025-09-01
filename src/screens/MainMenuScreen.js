@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import TouchableScale from 'react-native-touchable-scale';
 import Sound from 'react-native-sound';
 import { getData } from '../utils';
+import FastImage from 'react-native-fast-image';
 // import FastImage from 'react-native-fast-image';
 // import { Ionicons } from '@expo/vector-icons';
 
@@ -233,7 +234,7 @@ const MainMenuScreen = () => {
     <ImageBackground source={require('../assets/imgaes/background3.jpg')} style={styles.background}>
       <View style={styles.container}>
         <View style={{ marginHorizontal: 15, paddingVertical: 5, borderRadius: 30, borderWidth: 5, borderColor: '#000', width: 100, backgroundColor: '#6200EE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          <Image source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
+          <FastImage source={require('../assets/imgaes/goldcoin.gif')} style={styles.coin} />
           <Text style={{ color: '#fff', fontFamily: 'Audiowide-Regular' }}>{userDetail.Coins}</Text>
         </View>
         <Text style={styles.title}>Hyy, {userDetail.userName}</Text>

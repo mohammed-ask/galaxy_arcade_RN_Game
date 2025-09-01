@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Image } from "react-native"
+import { gifAssets } from "../screens/constants";
 
 function Spaceship({ body, isVisible, showShield, showMagnet, activeShipIcon }) {
   const [blinking, setBlinking] = useState(0.5)
@@ -25,9 +26,9 @@ function Spaceship({ body, isVisible, showShield, showMagnet, activeShipIcon }) 
     <>
       <Image source={activeShipIcon} style={{ position: 'absolute', left: body.position.x - 50 / 2, top: body.position.y - 50 / 2, height: 50, width: 50, opacity: isVisible ? 1 : blinking, zIndex: 1 }} />
       {showShield ?
-        <Image source={require("../assets/imgaes/shipshield.gif")} style={{ width: 100, height: 100, position: 'absolute', left: body.position.x - 50, top: body.position.y - 50 }} resizeMode='contain' /> : null}
+        <Image source={gifAssets[1]} style={{ width: 100, height: 100, position: 'absolute', left: body.position.x - 50, top: body.position.y - 50 }} resizeMode='contain' /> : null}
       {showMagnet ?
-        <Image source={require("../assets/imgaes/magnetism.gif")} style={{ width: 150, height: 150, position: 'absolute', left: body.position.x - 75, top: body.position.y - 75, zIndex: 0 }} resizeMode='contain' /> : null}
+        <Image source={gifAssets[2]} style={{ width: 150, height: 150, position: 'absolute', left: body.position.x - 75, top: body.position.y - 75, zIndex: 0 }} resizeMode='contain' /> : null}
     </>
   )
 }

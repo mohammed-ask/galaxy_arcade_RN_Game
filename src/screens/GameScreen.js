@@ -12,7 +12,7 @@ import {
     useMegaBomb
 } from './systems';
 import { createShip } from './entities';
-import { shipSize, spaceShipIcons, SHIELD_DURATION, MAGNET_DURATION, MULTIPLIER_DURATION, updatePowerUp } from './constants';
+import { shipSize, spaceShipIcons, SHIELD_DURATION, MAGNET_DURATION, MULTIPLIER_DURATION, updatePowerUp, preloadAssets } from './constants';
 import { initializeSounds, cleanupSounds, getData, updateBestScore } from './utils';
 import HUD from './HUD';
 import Spaceship from '../assets/Spaceship';
@@ -24,6 +24,9 @@ const { width, height } = Dimensions.get('screen');
 export default function GameScreen({ navigation }) {
     const gameEngine = useRef(null);
     const engineRef = useRef(Matter.Engine.create({ enableSleeping: true }));
+    engineRef.current.positionIterations = 4;   // default 6
+    engineRef.current.velocityIterations = 2;   // default 4
+    engineRef.current.constraintIterations = 1; // default 2
     const worldRef = useRef(engineRef.current.world);
     const shipRef = useRef(createShip());
     const entitiesRef = useRef({});
@@ -66,6 +69,7 @@ export default function GameScreen({ navigation }) {
     const [coinMagnetDuration, setCoinMagnetDuration] = useState(0);
     const [shieldDuration, setShieldDuration] = useState(0);
     const [multiplierDuration, setMultiplierDuration] = useState(0);
+    const [gameStart, setGameStart] = useState(false);
 
     useEffect(() => {
         const initializeGame = async () => {
@@ -80,20 +84,23 @@ export default function GameScreen({ navigation }) {
                     whooshRef.current.play();
                 });
             }
-
-            await resetGame();
-            // Pass setters to systems.js
-            initializeSystems(entitiesRef, gameStateRef, shipRef, {
-                setDisplayScore,
-                setDisplayCoins,
-                setDisplayLives,
-                setDisplayMegaBombCount,
-                setGameOver,
-                setCoinMagnetDuration,
-                setMultiplierDuration,
-                setShieldDuration,
-                setShowBlinkingHeart
-            });
+            await preloadAssets();
+            setTimeout(async () => {
+                await resetGame();
+                // Pass setters to systems.js
+                initializeSystems(entitiesRef, gameStateRef, shipRef, {
+                    setDisplayScore,
+                    setDisplayCoins,
+                    setDisplayLives,
+                    setDisplayMegaBombCount,
+                    setGameOver,
+                    setCoinMagnetDuration,
+                    setMultiplierDuration,
+                    setShieldDuration,
+                    setShowBlinkingHeart
+                });
+                setGameStart(true);
+            }, 3000);
         };
 
         initializeGame();
@@ -165,6 +172,9 @@ export default function GameScreen({ navigation }) {
 
         // Reinitialize engine and world
         engineRef.current = Matter.Engine.create({ enableSleeping: true });
+        engineRef.current.positionIterations = 4;   // default 6
+        engineRef.current.velocityIterations = 2;   // default 4
+        engineRef.current.constraintIterations = 1; // default 2
         worldRef.current = engineRef.current.world;
         shipRef.current = createShip();
 
@@ -330,6 +340,37 @@ export default function GameScreen({ navigation }) {
         return entities;
     };
 
+    const withProfiler = (system, name) => {
+        return (entities, args) => {
+            const start = performance.now();
+            const result = system(entities, args);
+            const end = performance.now();
+            const duration = (end - start);
+            if (duration > 20) { // log only heavy spikes
+                console.warn(`[⚠️ ${name}] took ${duration.toFixed(2)} ms`);
+            }
+            return result;
+        };
+    };
+
+    // const systems = [
+    //     withProfiler(Physics, "Physics"),
+    //     withProfiler(TimerSystem, "TimerSystem"),
+    //     withProfiler(MoveShip, "MoveShip"),
+    //     withProfiler(CoinAttractionSystem, "CoinAttractionSystem"),
+    //     withProfiler(BulletShooter, "BulletShooter"),
+    //     withProfiler(AsteroidSpawner, "AsteroidSpawner"),
+    //     withProfiler(MoveMega, "MoveMega"),
+    //     withProfiler(CoinSpawner, "CoinSpawner"),
+    //     withProfiler(MegaBombSpawner, "MegaBombSpawner"),
+    //     withProfiler(MultiplierSpawner, "MultiplierSpawner"),
+    //     withProfiler(ShieldSpawner, "ShieldSpawner"),
+    //     withProfiler(CoinMagnetSpawner, "CoinMagnetSpawner"),
+    //     withProfiler(handleCollisions, "handleCollisions"),
+    //     withProfiler(CleanupEntities, "CleanupEntities"),
+    //     // Profiler,
+    // ];
+
     const systems = [
         Physics,
         TimerSystem,
@@ -350,16 +391,17 @@ export default function GameScreen({ navigation }) {
 
     return (
         <ImageBackground source={require('../assets/imgaes/background3.jpg')} resizeMode="cover" style={styles.containerImg}>
-            <GameEngine
-                ref={gameEngine}
-                style={styles.container}
-                systems={systems}
-                entities={entitiesRef.current}
-                running={!gameOver && !gamePause}
-            >
-                <StatusBar hidden={true} />
-                <HUD gameState={gameStateRef.current} onUseMegaBomb={() => useMegaBomb()} showBlinkingHeart={showBlinkingHeart} />
-            </GameEngine>
+            {gameStart &&
+                <GameEngine
+                    ref={gameEngine}
+                    style={styles.container}
+                    systems={systems}
+                    entities={entitiesRef.current}
+                    running={!gameOver && !gamePause}
+                >
+                    <StatusBar hidden={true} />
+                    <HUD gameState={gameStateRef.current} onUseMegaBomb={() => useMegaBomb()} showBlinkingHeart={showBlinkingHeart} />
+                </GameEngine>}
 
             <Modal animationType="fade" transparent={true} visible={modalVisible}>
                 <View style={styles.modalContainer}>
@@ -375,16 +417,17 @@ export default function GameScreen({ navigation }) {
                 </View>
             </Modal>
 
-            <Modal animationType="fade" transparent={true} visible={showPauseModal}>
+            <Modal animationType="fade" transparent={true} visible={!gameStart || showPauseModal}>
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>GAME PAUSE</Text>
-                        <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false); setShowPauseModal(false); }}>
-                            <Text style={styles.modalButtonText}>Resume</Text>
-                        </TouchableScale>
-                        <TouchableScale style={styles.modalButton} onPress={() => navigation.replace('MainMenu')}>
-                            <Text style={styles.modalButtonText}>Go Back</Text>
-                        </TouchableScale>
+                        {!gameStart ? <Text style={{ ...styles.modalTitle, marginTop: 20 }}>Loading...</Text> : <>
+                            <Text style={styles.modalTitle}>GAME PAUSE</Text>
+                            <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false); setShowPauseModal(false); }}>
+                                <Text style={styles.modalButtonText}>Resume</Text>
+                            </TouchableScale>
+                            <TouchableScale style={styles.modalButton} onPress={() => navigation.replace('MainMenu')}>
+                                <Text style={styles.modalButtonText}>Go Back</Text>
+                            </TouchableScale></>}
                     </View>
                 </View>
             </Modal>

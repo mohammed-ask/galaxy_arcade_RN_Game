@@ -1242,7 +1242,7 @@ export default function GameScreen({ navigation }) {
   };
 
   return (
-    <ImageBackground source={require('../assets/imgaes/background2.jpg')} resizeMode='cover' style={styles.containerImg}>
+    <ImageBackground source={require('../assets/imgaes/background3.jpg')} resizeMode='cover' style={styles.containerImg}>
       <GameEngine
         ref={gameEngine}
         style={styles.container}
