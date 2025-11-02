@@ -82,8 +82,8 @@ android {
         applicationId "com.galaxyarcade"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "1.4"
+        versionCode 7
+        versionName "1.5"
     }
     signingConfigs {
         release {
@@ -118,10 +118,9 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-    implementation 'com.facebook.fresco:fresco:1.+'
+        implementation 'com.facebook.fresco:fresco:3.6.0'
+implementation 'com.facebook.fresco:animated-gif:3.6.0'
 
-    // For animated GIF support
-    implementation 'com.facebook.fresco:animated-gif:3.3.0'
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

@@ -1,5 +1,5 @@
 import { BlurView } from '@react-native-community/blur';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,12 +7,10 @@ import {
     StyleSheet,
     StatusBar,
     ImageBackground,
-    BackHandler
+    BackHandler,
+    Animated
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import Animated, {
-    FadeInDown
-} from 'react-native-reanimated';
 
 const LeaderboardScreen = ({ navigation }) => {
     const data = [
@@ -23,10 +21,29 @@ const LeaderboardScreen = ({ navigation }) => {
         { name: "Yuki", score: 1600 },
     ];
 
+    // Initialize animations after data is defined
+    const itemAnimations = useRef(data.map(() => new Animated.Value(0))).current;
+
     useEffect(() => {
         (async () => {
             // AsyncStorage.setItem('Coins', '15000')
-        })()
+        })();
+
+        // Animate items sequentially
+        const animateItems = () => {
+            const animations = itemAnimations.map((anim, index) =>
+                Animated.timing(anim, {
+                    toValue: 1,
+                    duration: 300,
+                    delay: index * 100,
+                    useNativeDriver: true,
+                })
+            );
+            Animated.stagger(100, animations).start();
+        };
+
+        animateItems();
+
         const backAction = () => {
             navigation.navigate('MainMenu')
             return true
@@ -46,10 +63,20 @@ const LeaderboardScreen = ({ navigation }) => {
 
     const renderItem = ({ item, index }) => (
         <Animated.View
-            entering={FadeInDown.delay(index * 100)}
             style={[
                 styles.itemContainer,
-                index === 0 && styles.topItem
+                index === 0 && styles.topItem,
+                {
+                    opacity: itemAnimations[index],
+                    transform: [
+                        {
+                            translateY: itemAnimations[index].interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [50, 0],
+                            })
+                        }
+                    ]
+                }
             ]}
         >
             <LinearGradient
@@ -83,20 +110,12 @@ const LeaderboardScreen = ({ navigation }) => {
             <BlurView style={{ width: '100%', flex: 1 }} blurType="light" blurAmount={1} overlayColor='rgba(0,0,0,0.1)'>
                 <View style={styles.containerInner}>
                     <Text style={styles.title}>Leaderboard</Text>
-                    {/* <LinearGradient
-                colors={['#1E1F34', '#121212']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.background}
-            > */}
-                    {/* <Text style={styles.header}>Leaderboard</Text> */}
                     <FlatList
                         data={sortedData}
                         renderItem={renderItem}
                         keyExtractor={(item) => item.name}
                         contentContainerStyle={styles.listContainer}
                     />
-                    {/* </LinearGradient> */}
                 </View>
             </BlurView>
         </ImageBackground>
@@ -130,7 +149,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 36,
         color: '#FFF',
-        fontFamily: 'Audiowide-Regular', // Use a pixelated font
+        fontFamily: 'Audiowide-Regular',
         marginBottom: 25,
         marginLeft: 20,
         marginTop: 10
@@ -169,7 +188,6 @@ const styles = StyleSheet.create({
     rankText: {
         color: '#FFFFFF',
         fontSize: 18,
-        // fontWeight: 'bold',
         fontFamily: 'Audiowide-Regular',
     },
     infoContainer: {
@@ -178,14 +196,12 @@ const styles = StyleSheet.create({
     nameText: {
         color: '#FFFFFF',
         fontSize: 18,
-        // fontWeight: '600',
         marginBottom: 5,
         fontFamily: 'Audiowide-Regular',
     },
     scoreText: {
         color: 'rgba(255, 255, 255, 0.9)',
         fontSize: 16,
-        // fontWeight: '500',
         fontFamily: 'Audiowide-Regular',
     },
 });
