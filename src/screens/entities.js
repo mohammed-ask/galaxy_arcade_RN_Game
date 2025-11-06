@@ -75,11 +75,12 @@ export const getBulletFromPool = (x, y, isEnemyBullet = false) => {
 
 
 // Asteroid creation (with pooling)
-export const getAsteroidFromPool = (x, y, isMeteor = false, isMega = false) => {
+export const getAsteroidFromPool = (x, y, isMeteor = false, isMega = false, enemySpeedMultiplier = 0) => {
     const asteroid = asteroidPool.find(a => !a.isActive);
+    console.log(enemySpeedMultiplier, 'ememem')
     if (asteroid) {
         asteroid.label = isMega ? 'mega' : isMeteor ? 'meteor' : 'asteroid';
-        asteroid.frictionAir = isMega ? 0.6 : isMeteor ? 0.15 : 0.1;
+        asteroid.frictionAir = isMega ? 0.6 : isMeteor ? 0.15 - Number(enemySpeedMultiplier) : 0.1 - Number(enemySpeedMultiplier);
         asteroid.health = isMega ? 15 : isMeteor ? 4 : 1;
         Matter.Body.setPosition(asteroid, { x, y });
         Matter.Body.setVelocity(asteroid, { x: 0, y: 5 });
@@ -90,7 +91,7 @@ export const getAsteroidFromPool = (x, y, isMeteor = false, isMega = false) => {
     const newAsteroid = Matter.Bodies.circle(x, y, 40, {
         label: isMega ? 'mega' : isMeteor ? 'meteor' : 'asteroid',
         restitution: 0.5,
-        frictionAir: isMega ? 0.6 : isMeteor ? 0.15 : 0.1,
+        frictionAir: isMega ? 0.6 : isMeteor ? 0.15 - Number(enemySpeedMultiplier) : 0.1 - Number(enemySpeedMultiplier),
         health: isMega ? 15 : isMeteor ? 4 : 1,
         id: `asteroid_extra_${Date.now()}`,
     });

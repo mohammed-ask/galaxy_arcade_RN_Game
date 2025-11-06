@@ -22,13 +22,15 @@ let gameStateRef = null;
 let shipRef = null;
 let setters = {}; // Store setters from GameScreen
 let collisionRegistered = false;
-
+let levelUpDone = false
 // Initialize references (call this from GameScreen)
 export const initializeSystems = (entities, gameState, ship, stateSetters) => {
     entitiesRef = entities;
     gameStateRef = gameState;
     shipRef = ship;
     setters = stateSetters; // Store setters (setDisplayScore, setDisplayCoins, etc.)
+    collisionRegistered = false,
+        levelUpDone = false
 };
 
 // Fixed time step for physics
@@ -77,9 +79,9 @@ export const Physics = (entities, { time }) => {
 export const TimerSystem = (entities, { time }) => {
     try {
         gameStateRef.current.elapsedTime = (gameStateRef.current.elapsedTime || 0) + time.delta;
-        if (gameStateRef.current.elapsedTime >= 30000) {
+        if (gameStateRef.current.elapsedTime >= 20000) {
             gameStateRef.current.elapsedTime = 0;
-            if (gameStateRef.current.enemySpeedMultiplier < 0.08) {
+            if (gameStateRef.current.enemySpeedMultiplier < 0.5) {
                 gameStateRef.current.enemySpeedMultiplier = (gameStateRef.current.enemySpeedMultiplier || 0) + 0.02;
             }
         }
@@ -137,22 +139,29 @@ export const BulletShooter = (entities, { time }) => {
             bulletCooldown = 0;
             playSound('laser', 10000);
 
-            // const isLevelUp = gameStateRef.current.score >= 200000;
-            // if (!isLevelUp) {
-            const bullet = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
-            Matter.World.add(entities.physics.world, bullet);
-            entities[`bullet_${bullet.id}`] = { body: bullet, color: 'yellow', renderer: Bullet };
-            // }
-            // if (isLevelUp) { // Assuming levelUp is tracked in gameStateRef
-            //     const bullet2 = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
-            //     const bullet3 = getBulletFromPool(shipRef.current.position.x + 10, shipRef.current.position.y - 30);
-            //     if (bullet2 && bullet3) {
-            //         Matter.World.add(entities.physics.world, bullet2);
-            //         Matter.World.add(entities.physics.world, bullet3);
-            //         entities[`bullet_${bullet2.id}_${Date.now()}_1`] = { body: bullet2, color: 'yellow', renderer: Bullet };
-            //         entities[`bullet_${bullet3.id}_${Date.now()}_2`] = { body: bullet3, color: 'yellow', renderer: Bullet };
-            //     }
-            // }
+            const isLevelUp = gameStateRef.current.score >= 200;
+            if (!isLevelUp) {
+                const bullet = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
+                Matter.World.add(entities.physics.world, bullet);
+                entities[`bullet_${bullet.id}`] = { body: bullet, color: 'yellow', renderer: Bullet };
+            }
+            if (isLevelUp) { // Assuming levelUp is tracked in gameStateRef
+                const bullet2 = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
+                const bullet3 = getBulletFromPool(shipRef.current.position.x + 10, shipRef.current.position.y - 30);
+                if (bullet2 && bullet3) {
+                    Matter.World.add(entities.physics.world, bullet2);
+                    Matter.World.add(entities.physics.world, bullet3);
+                    entities[`bullet_${bullet2.id}_${Date.now()}_1`] = { body: bullet2, color: 'yellow', renderer: Bullet };
+                    entities[`bullet_${bullet3.id}_${Date.now()}_2`] = { body: bullet3, color: 'yellow', renderer: Bullet };
+                }
+                if (!levelUpDone) {
+                    setters.openModal()
+                    setTimeout(() => {
+                        setters.closeModal()
+                    }, 1800);
+                    levelUpDone = true
+                }
+            }
         }
         return entities;
     } catch (e) {
@@ -168,7 +177,7 @@ export const AsteroidSpawner = (entities, { time }) => {
         const isLevel3 = gameStateRef.current.score >= 500;
 
         if (isLevel3 && !gameStateRef.current.megaSpawned) {
-            const mega = getAsteroidFromPool(Math.random() * (width - 80) + 40, 0, false, true);
+            const mega = getAsteroidFromPool(Math.random() * (width - 80) + 40, 0, false, true, gameStateRef.current.enemySpeedMultiplier);
             if (mega) {
                 Matter.World.add(entities.physics.world, mega);
                 entities[`mega_${mega.id}`] = { body: mega, color: 'purple', renderer: Asteroid, health: 20 };
@@ -180,7 +189,7 @@ export const AsteroidSpawner = (entities, { time }) => {
             asteroidCooldown = 0;
             const x = Math.random() * (width - 80) + 40;
             const isMeteor = isLevelUp && Math.random() < 0.5;
-            const asteroid = getAsteroidFromPool(x, 0, isMeteor);
+            const asteroid = getAsteroidFromPool(x, 0, isMeteor, false, gameStateRef.current.enemySpeedMultiplier);
             if (asteroid) {
                 Matter.World.add(entities.physics.world, asteroid);
                 entities[`${isMeteor ? 'meteor' : 'asteroid'}_${asteroid.id}`] = {

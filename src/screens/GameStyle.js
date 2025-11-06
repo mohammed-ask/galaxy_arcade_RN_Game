@@ -93,5 +93,62 @@ const styles = StyleSheet.create({
         top: 40,
         right: 0
     },
+    button: {
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 30,
+        paddingVertical: 15,
+        borderRadius: 25,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+    },
+    buttonText: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    modalOverlay: {
+        // flex: 1,
+        // justifyContent: 'center',
+        // alignItems: 'center',
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)'
+    },
+    modalBackground: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContentLevel: {
+        backgroundColor: 'transparent',
+        padding: 30,
+        borderRadius: 20,
+        alignItems: 'center',
+        minWidth: 250,
+    },
+    animatedText: {
+        fontSize: 28,
+        fontFamily: 'Audiowide-Regular',
+        color: '#FF6B6B',
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    closeButton: {
+        backgroundColor: '#6C757D',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 15,
+        marginTop: 10,
+    },
+    closeButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '500',
+    },
 });
 export default styles;

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Modal, Text, ImageBackground, StatusBar, AppState, BackHandler, Dimensions } from 'react-native';
+import { View, Modal, Text, ImageBackground, StatusBar, AppState, BackHandler, Dimensions, Animated, Easing, TouchableOpacity } from 'react-native';
 import Matter from 'matter-js';
 import { GameEngine } from 'react-native-game-engine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -70,6 +70,59 @@ export default function GameScreen({ navigation }) {
     const [shieldDuration, setShieldDuration] = useState(0);
     const [multiplierDuration, setMultiplierDuration] = useState(0);
     const [gameStart, setGameStart] = useState(false);
+    const [levelModalVisible, setLevelModalVisible] = useState(false);
+    const scaleAnim = useRef(new Animated.Value(0)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    const openModal = () => {
+        setLevelModalVisible(true);
+        // Reset animations
+        scaleAnim.setValue(0);
+        fadeAnim.setValue(0);
+
+        // Start animations
+        Animated.parallel([
+            Animated.timing(scaleAnim, {
+                toValue: 1.5,
+                duration: 800,
+                easing: Easing.elastic(1.2),
+                useNativeDriver: true,
+            }),
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 600,
+                easing: Easing.ease,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    };
+
+    const closeModal = () => {
+        Animated.parallel([
+            Animated.timing(scaleAnim, {
+                toValue: 0,
+                duration: 300,
+                easing: Easing.ease,
+                useNativeDriver: true,
+            }),
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 300,
+                easing: Easing.ease,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            setLevelModalVisible(false);
+        });
+    };
+
+    useEffect(() => {
+        if (modalVisible) {
+            setTimeout(() => {
+                closeModal();
+            }, 1000);
+        }
+    }, [modalVisible]);
 
     useEffect(() => {
         const initializeGame = async () => {
@@ -97,7 +150,9 @@ export default function GameScreen({ navigation }) {
                     setCoinMagnetDuration,
                     setMultiplierDuration,
                     setShieldDuration,
-                    setShowBlinkingHeart
+                    setShowBlinkingHeart,
+                    openModal,
+                    closeModal
                 });
                 setGameStart(true);
             }, 3000);
@@ -146,6 +201,7 @@ export default function GameScreen({ navigation }) {
 
     // Stop the game
     const stopGame = () => {
+        console.log('gamestop')
         Matter.Engine.clear(engineRef.current); // Stop the physics engine
         Matter.World.clear(worldRef.current, false);
         if (gameEngine.current) {
@@ -163,6 +219,7 @@ export default function GameScreen({ navigation }) {
 
     // Reset game state
     const resetGame = async () => {
+        console.log('game reset')
         initializeSounds();
         // Clear existing engine and event listeners
         if (engineRef.current) {
@@ -429,6 +486,29 @@ export default function GameScreen({ navigation }) {
                                 <Text style={styles.modalButtonText}>Go Back</Text>
                             </TouchableScale></>}
                     </View>
+                </View>
+            </Modal>
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={levelModalVisible}
+            >
+                <View style={styles.modalOverlay}>
+                    <TouchableOpacity style={styles.modalBackground} activeOpacity={1}>
+                        <View style={styles.modalContentLevel}>
+                            <Animated.Text
+                                style={[
+                                    styles.animatedText,
+                                    {
+                                        transform: [{ scale: scaleAnim }],
+                                        opacity: fadeAnim,
+                                    },
+                                ]}
+                            >
+                                LEVEL UP!
+                            </Animated.Text>
+                        </View>
+                    </TouchableOpacity>
                 </View>
             </Modal>
         </ImageBackground>
