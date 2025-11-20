@@ -150,5 +150,71 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '500',
     },
+
+    // Add to GameStyle.js
+difficultyContainer: {
+    position: 'absolute',
+    top: 80,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 10,
+    padding: 10,
+    alignItems: 'center',
+},
+difficultyText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'Audiowide-Regular',
+    marginBottom: 5,
+},
+difficultyBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+},
+difficultyProgress: {
+    height: '100%',
+    backgroundColor: '#FF6B6B',
+    borderRadius: 3,
+},
+enemiesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+},
+enemyIconWrapper: {
+    alignItems: 'center',
+    flex: 1,
+    position: 'relative',
+},
+enemyIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+},
+enemyUnlocked: {
+    opacity: 1,
+    borderWidth: 2,
+    borderColor: '#4ECDC4',
+},
+enemyLocked: {
+    opacity: 0.3,
+    borderWidth: 1,
+    borderColor: '#666',
+},
+enemyConnector: {
+    position: 'absolute',
+    top: 11,
+    right: -12,
+    width: 24,
+    height: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    zIndex: -1,
+},
 });
 export default styles;

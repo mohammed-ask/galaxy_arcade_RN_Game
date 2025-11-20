@@ -18,6 +18,7 @@ import HUD from './HUD';
 import Spaceship from '../assets/Spaceship';
 import styles from './GameStyle';
 import Explosion from '../assets/Explosion';
+import { ProgressiveDifficulty } from './progressiveDifficulty';
 
 const { width, height } = Dimensions.get('screen');
 
@@ -31,6 +32,7 @@ export default function GameScreen({ navigation }) {
     const shipRef = useRef(createShip());
     const entitiesRef = useRef({});
     const whooshRef = useRef(null);
+    const progressiveDifficultyRef = useRef(null);
 
     const gameStateRef = useRef({
         lives: 3,
@@ -140,6 +142,7 @@ export default function GameScreen({ navigation }) {
             await preloadAssets();
             setTimeout(async () => {
                 await resetGame();
+                progressiveDifficultyRef.current = new ProgressiveDifficulty(gameStateRef);
                 // Pass setters to systems.js
                 initializeSystems(entitiesRef, gameStateRef, shipRef, {
                     setDisplayScore,
@@ -153,7 +156,7 @@ export default function GameScreen({ navigation }) {
                     setShowBlinkingHeart,
                     openModal,
                     closeModal
-                });
+                },progressiveDifficultyRef.current);
                 setGameStart(true);
             }, 3000);
         };
@@ -457,7 +460,7 @@ export default function GameScreen({ navigation }) {
                     running={!gameOver && !gamePause}
                 >
                     <StatusBar hidden={true} />
-                    <HUD gameState={gameStateRef.current} onUseMegaBomb={() => useMegaBomb()} showBlinkingHeart={showBlinkingHeart} />
+                    <HUD gameState={gameStateRef.current} onUseMegaBomb={() => useMegaBomb()} showBlinkingHeart={showBlinkingHeart} difficulty={progressiveDifficultyRef.current?.currentMilestone || 0} />
                 </GameEngine>}
 
             <Modal animationType="fade" transparent={true} visible={modalVisible}>

@@ -23,14 +23,18 @@ let shipRef = null;
 let setters = {}; // Store setters from GameScreen
 let collisionRegistered = false;
 let levelUpDone = false
+
+let progressiveDifficulty = null;
+
 // Initialize references (call this from GameScreen)
-export const initializeSystems = (entities, gameState, ship, stateSetters) => {
+export const initializeSystems = (entities, gameState, ship, stateSetters, difficultySystem) => {
     entitiesRef = entities;
     gameStateRef = gameState;
     shipRef = ship;
     setters = stateSetters; // Store setters (setDisplayScore, setDisplayCoins, etc.)
     collisionRegistered = false,
-        levelUpDone = false
+    levelUpDone = false,
+    progressiveDifficulty = difficultySystem;
 };
 
 // Fixed time step for physics
@@ -77,18 +81,18 @@ export const Physics = (entities, { time }) => {
 };
 
 export const TimerSystem = (entities, { time }) => {
-    try {
-        gameStateRef.current.elapsedTime = (gameStateRef.current.elapsedTime || 0) + time.delta;
-        if (gameStateRef.current.elapsedTime >= 20000) {
-            gameStateRef.current.elapsedTime = 0;
-            if (gameStateRef.current.enemySpeedMultiplier < 0.5) {
-                gameStateRef.current.enemySpeedMultiplier = (gameStateRef.current.enemySpeedMultiplier || 0) + 0.02;
-            }
-        }
-        return entities;
-    } catch (e) {
-        console.log(e)
+  try {
+    gameStateRef.current.elapsedTime = (gameStateRef.current.elapsedTime || 0) + time.delta;
+    
+    // Update progressive difficulty
+    if (progressiveDifficulty) {
+      progressiveDifficulty.updateDifficulty(gameStateRef.current.score);
     }
+    
+    return entities;
+  } catch (e) {
+    console.log(e);
+  }
 };
 
 export const MoveShip = (entities, { touches }) => {
@@ -129,96 +133,145 @@ export const CoinAttractionSystem = (entities, { time }) => {
 
 let bulletCooldown = 0;
 export const BulletShooter = (entities, { time }) => {
-    try {
-        if (!entities || !entities.physics || !entities.physics.world) {
-            console.warn('BulletShooter: entities or entities.physics is undefined');
-            return entities || entitiesRef.current || {};
-        }
-        bulletCooldown += time.delta;
-        if (bulletCooldown > gameStateRef.current.bulletSpeed) {
-            bulletCooldown = 0;
-            playSound('laser', 10000);
+  try {
+    if (!entities?.physics?.world) return entities;
 
-            const isLevelUp = gameStateRef.current.score >= 200;
-            if (!isLevelUp) {
-                const bullet = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
-                Matter.World.add(entities.physics.world, bullet);
-                entities[`bullet_${bullet.id}`] = { body: bullet, color: 'yellow', renderer: Bullet };
-            }
-            if (isLevelUp) { // Assuming levelUp is tracked in gameStateRef
-                const bullet2 = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
-                const bullet3 = getBulletFromPool(shipRef.current.position.x + 10, shipRef.current.position.y - 30);
-                if (bullet2 && bullet3) {
-                    Matter.World.add(entities.physics.world, bullet2);
-                    Matter.World.add(entities.physics.world, bullet3);
-                    entities[`bullet_${bullet2.id}_${Date.now()}_1`] = { body: bullet2, color: 'yellow', renderer: Bullet };
-                    entities[`bullet_${bullet3.id}_${Date.now()}_2`] = { body: bullet3, color: 'yellow', renderer: Bullet };
-                }
-                if (!levelUpDone) {
-                    setters.openModal()
-                    setTimeout(() => {
-                        setters.closeModal()
-                    }, 1800);
-                    levelUpDone = true
-                }
-            }
+    bulletCooldown += time.delta;
+    
+    // Make shooting slightly harder as game progresses
+    const baseBulletSpeed = gameStateRef.current.bulletSpeed;
+    const difficultyFactor = progressiveDifficulty ? 
+      Math.max(0.7, 1.0 - (progressiveDifficulty.currentMilestone * 0.05)) : 1.0;
+    
+    const adjustedBulletSpeed = baseBulletSpeed * difficultyFactor;
+    
+    if (bulletCooldown > adjustedBulletSpeed) {
+      bulletCooldown = 0;
+      playSound('laser', 10000);
+
+      // Simple bullet pattern based on score
+      const score = gameStateRef.current.score;
+      if (score >= 500) {
+        // Triple shot at high scores
+        const bullets = [
+          getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30),
+          getBulletFromPool(shipRef.current.position.x - 20, shipRef.current.position.y - 25),
+          getBulletFromPool(shipRef.current.position.x + 20, shipRef.current.position.y - 25)
+        ];
+        
+        bullets.forEach((bullet, index) => {
+          if (bullet) {
+            Matter.World.add(entities.physics.world, bullet);
+            entities[`bullet_${bullet.id}_${index}`] = { body: bullet, color: 'yellow', renderer: Bullet };
+          }
+        });
+      } else if (score >= 200) {
+        // Double shot at medium scores
+        const bullet1 = getBulletFromPool(shipRef.current.position.x - 15, shipRef.current.position.y - 30);
+        const bullet2 = getBulletFromPool(shipRef.current.position.x + 15, shipRef.current.position.y - 30);
+        
+        if (bullet1 && bullet2) {
+          Matter.World.add(entities.physics.world, bullet1);
+          Matter.World.add(entities.physics.world, bullet2);
+          entities[`bullet_${bullet1.id}_1`] = { body: bullet1, color: 'yellow', renderer: Bullet };
+          entities[`bullet_${bullet2.id}_2`] = { body: bullet2, color: 'yellow', renderer: Bullet };
         }
-        return entities;
-    } catch (e) {
-        console.log('bulletshooter', e)
+      } else {
+        // Single shot at low scores
+        const bullet = getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30);
+        if (bullet) {
+          Matter.World.add(entities.physics.world, bullet);
+          entities[`bullet_${bullet.id}`] = { body: bullet, color: 'yellow', renderer: Bullet };
+        }
+      }
     }
+    return entities;
+  } catch (e) {
+    console.log('bulletshooter', e);
+  }
 };
 
 let asteroidCooldown = 0;
+// Progressive Asteroid Spawner
 export const AsteroidSpawner = (entities, { time }) => {
-    try {
-        asteroidCooldown += time.delta;
-        const isLevelUp = gameStateRef.current.score >= 200;
-        const isLevel3 = gameStateRef.current.score >= 500;
-
-        if (isLevel3 && !gameStateRef.current.megaSpawned) {
-            const mega = getAsteroidFromPool(Math.random() * (width - 80) + 40, 0, false, true, gameStateRef.current.enemySpeedMultiplier);
+  try {
+    asteroidCooldown += time.delta;
+    
+    if (!progressiveDifficulty) return entities;
+    
+    const settings = progressiveDifficulty.getInfiniteProgressionSettings();
+    
+    if (asteroidCooldown > settings.spawnRate && Math.random() < 0.02) {
+      asteroidCooldown = 0;
+      
+      const enemyType = progressiveDifficulty.getRandomEnemyType();
+      const x = Math.random() * (width - 80) + 40;
+      
+      switch (enemyType) {
+        case 'asteroid':
+          const asteroid = getAsteroidFromPool(x, 0, false, false, settings.enemySpeed);
+          if (asteroid) {
+            Matter.World.add(entities.physics.world, asteroid);
+            entities[`asteroid_${asteroid.id}`] = {
+              body: asteroid,
+              color: colors[Math.floor(Math.random() * colors.length)],
+              renderer: Asteroid,
+              health: 1,
+            };
+          }
+          break;
+          
+        case 'meteor':
+          const meteor = getAsteroidFromPool(x, 0, true, false, settings.enemySpeed);
+          if (meteor) {
+            Matter.World.add(entities.physics.world, meteor);
+            entities[`meteor_${meteor.id}`] = {
+              body: meteor,
+              color: 'red',
+              renderer: Asteroid,
+              health: 2,
+            };
+          }
+          break;
+          
+        case 'mega':
+          if (!gameStateRef.current.megaSpawned && Math.random() < 0.1) { // 10% chance when available
+            const mega = getAsteroidFromPool(x, 0, false, true, settings.enemySpeed);
             if (mega) {
-                Matter.World.add(entities.physics.world, mega);
-                entities[`mega_${mega.id}`] = { body: mega, color: 'purple', renderer: Asteroid, health: 20 };
-                gameStateRef.current.megaSpawned = true;
+              Matter.World.add(entities.physics.world, mega);
+              entities[`mega_${mega.id}`] = { 
+                body: mega, 
+                color: 'purple', 
+                renderer: Asteroid, 
+                health: 20 
+              };
+              gameStateRef.current.megaSpawned = true;
             }
-        }
-
-        if (asteroidCooldown > 500 && Math.random() < 0.01) {
-            asteroidCooldown = 0;
-            const x = Math.random() * (width - 80) + 40;
-            const isMeteor = isLevelUp && Math.random() < 0.5;
-            const asteroid = getAsteroidFromPool(x, 0, isMeteor, false, gameStateRef.current.enemySpeedMultiplier);
-            if (asteroid) {
-                Matter.World.add(entities.physics.world, asteroid);
-                entities[`${isMeteor ? 'meteor' : 'asteroid'}_${asteroid.id}`] = {
-                    body: asteroid,
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    renderer: Asteroid,
-                    health: asteroid.health,
-                    enemyGenerate: asteroidImages[Math.floor(Math.random() * 8) + 1],
-                };
+          }
+          break;
+          
+        case 'boss':
+          if (!gameStateRef.current.bossSpawned && Math.random() < 0.05) { // 5% chance when available
+            const boss = getAsteroidFromPool(x, 0, false, false, settings.enemySpeed * 0.7, true); // Boss moves slower
+            if (boss) {
+              Matter.World.add(entities.physics.world, boss);
+              entities[`boss_${boss.id}`] = { 
+                body: boss, 
+                color: 'darkred', 
+                renderer: Asteroid, 
+                health: 50 
+              };
+              gameStateRef.current.bossSpawned = true;
             }
-        }
-
-        // Mega shooting
-        Object.keys(entities).forEach(key => {
-            const entity = entities[key];
-            if (entity.body?.label === 'mega' && Math.random() < 0.01) {
-                const bullet = getBulletFromPool(entity.body.position.x + 10, entity.body.position.y + 30, true);
-                if (bullet) {
-                    Matter.Body.setVelocity(bullet, { x: 0, y: 3 });
-                    Matter.World.add(entities.physics.world, bullet);
-                    entities[`enemyBullet_${bullet.id}`] = { body: bullet, color: 'red', renderer: Bullet };
-                }
-            }
-        });
-
-        return entities;
-    } catch (e) {
-        console.log('asterodi', e)
+          }
+          break;
+      }
     }
+
+    return entities;
+  } catch (e) {
+    console.log('asteroidspawner', e);
+  }
 };
 
 export const MoveMega = (entities, { time }) => {

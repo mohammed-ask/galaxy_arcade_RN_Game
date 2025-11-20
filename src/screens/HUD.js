@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, Animated } from 'react-native';
-import TimerBar from '../components/TimerBar'; // Assuming this is your TimerBar component
-import Life from '../assets/Life'; // Assuming this is your Life component
+import TimerBar from '../components/TimerBar';
+import Life from '../assets/Life';
 import styles from './GameStyle';
 import { SHIELD_DURATION, MAGNET_DURATION, MULTIPLIER_DURATION } from './constants';
 
-const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart }) => {
+const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart, difficulty }) => {
     const {
         score,
         lives,
@@ -19,8 +19,9 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart }) => {
         coinMagnetDuration,
     } = gameState;
 
-    // const [scoreAnim, setScoreAnim] = useState(score);
     const rotateAnim = useRef(new Animated.Value(0)).current;
+    const [unlockedEnemies, setUnlockedEnemies] = useState(['asteroid']);
+    const [difficultyProgress, setDifficultyProgress] = useState(0);
 
     const updateScore = () => {
         rotateAnim.setValue(0);
@@ -31,15 +32,31 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart }) => {
         }).start();
     };
 
-    // Interpolate the rotation on the X-axis for a vertical flip
     const rotateX = rotateAnim.interpolate({
         inputRange: [0, 0.5, 1],
-        outputRange: ['0deg', '180deg', '0deg'], // Full vertical flip
+        outputRange: ['0deg', '180deg', '0deg'],
     });
+
+    // Update difficulty indicators when difficulty changes
+    useEffect(() => {
+        if (difficulty) {
+            const settings = difficulty.getInfiniteProgressionSettings();
+            setUnlockedEnemies(settings.unlockedEnemies);
+            setDifficultyProgress(difficulty.calculateProgressBetweenMilestones());
+        }
+    }, [difficulty?.currentMilestone, score]);
 
     useEffect(() => {
         updateScore()
     }, [score])
+
+    // Enemy icons for the difficulty indicator
+    const enemyIcons = {
+        'asteroid': require('../assets/imgaes/asteroid1.png'),
+        'meteor': require('../assets/imgaes/asteroid1.png'),
+        'mega': require('../assets/imgaes/mega.png'),
+        // 'boss': require('../assets/imgaes/boss.png'),
+    };
 
     return (
         <>
@@ -49,11 +66,7 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart }) => {
                     Score:
                 </Text>
                 <Animated.View style={{
-                    transform: [
-                        // { perspective: 1000 }, // Adds 3D depth
-                        { rotateX }, // Vertical flip
-                    ],
-                    // Anchor the flip point to avoid excessive movement
+                    transform: [{ rotateX }],
                     justifyContent: 'center',
                     alignItems: 'center',
                 }}>
@@ -65,6 +78,40 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart }) => {
                 </Animated.View>
                 <Text style={{ ...styles.score }}>{isMultiplierActive ? ' x2' : ''}</Text>
             </View>
+
+            {/* Difficulty Progress Bar */}
+            <View style={styles.difficultyContainer}>
+                <Text style={styles.difficultyText}>DIFFICULTY</Text>
+                <View style={styles.difficultyBar}>
+                    <View 
+                        style={[
+                            styles.difficultyProgress, 
+                            { width: `${difficultyProgress * 100}%` }
+                        ]} 
+                    />
+                </View>
+                
+                {/* Unlocked Enemies Indicator */}
+                <View style={styles.enemiesContainer}>
+                    {Object.keys(enemyIcons).map((enemyType, index) => (
+                        <View key={enemyType} style={styles.enemyIconWrapper}>
+                            <Image
+                                source={enemyIcons[enemyType]}
+                                style={[
+                                    styles.enemyIcon,
+                                    unlockedEnemies.includes(enemyType) 
+                                        ? styles.enemyUnlocked 
+                                        : styles.enemyLocked
+                                ]}
+                            />
+                            {index < Object.keys(enemyIcons).length - 1 && (
+                                <View style={styles.enemyConnector} />
+                            )}
+                        </View>
+                    ))}
+                </View>
+            </View>
+
             {/* Lives Display */}
             <View style={styles.lives}>
                 {Array(lives).fill().map((_, i) => (
@@ -102,23 +149,23 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart }) => {
                     multiplierProgress={multiplierDuration * 10}
                     isMultiplierActive={isMultiplierActive}
                     range={MULTIPLIER_DURATION * 10}
-                    top={120}
+                    top={160} // Increased top to make space for difficulty indicator
                 />
             )}
             {isShieldActive && (
                 <TimerBar
                     multiplierProgress={shieldDuration * 10}
-                    isMultiplierActive={isShieldActive} // Shield doesn’t use multiplier styling
+                    isMultiplierActive={isShieldActive}
                     range={SHIELD_DURATION * 10}
-                    top={isMultiplierActive ? 150 : 120}
+                    top={isMultiplierActive ? 190 : 160}
                 />
             )}
             {isCoinMagnetActive && (
                 <TimerBar
                     multiplierProgress={coinMagnetDuration * 10}
-                    isMultiplierActive={isCoinMagnetActive} // Coin magnet doesn’t use multiplier styling
+                    isMultiplierActive={isCoinMagnetActive}
                     range={MAGNET_DURATION * 10}
-                    top={isMultiplierActive && isShieldActive ? 180 : isMultiplierActive || isShieldActive ? 150 : 120}
+                    top={isMultiplierActive && isShieldActive ? 220 : isMultiplierActive || isShieldActive ? 190 : 160}
                 />
             )}
         </>
