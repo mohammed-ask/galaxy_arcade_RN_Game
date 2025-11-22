@@ -53,7 +53,7 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart, difficult
     // Enemy icons for the difficulty indicator
     const enemyIcons = {
         'asteroid': require('../assets/imgaes/asteroid1.png'),
-        'meteor': require('../assets/imgaes/asteroid1.png'),
+        'meteor': require('../assets/imgaes/asteroid2.png'),
         'mega': require('../assets/imgaes/mega.png'),
         // 'boss': require('../assets/imgaes/boss.png'),
     };
@@ -80,7 +80,7 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart, difficult
             </View>
 
             {/* Difficulty Progress Bar */}
-            <View style={styles.difficultyContainer}>
+            <View style={{...styles.difficultyContainer,position: 'absolute', bottom: 5}}>
                 <Text style={styles.difficultyText}>DIFFICULTY</Text>
                 <View style={styles.difficultyBar}>
                     <View 
@@ -149,7 +149,7 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart, difficult
                     multiplierProgress={multiplierDuration * 10}
                     isMultiplierActive={isMultiplierActive}
                     range={MULTIPLIER_DURATION * 10}
-                    top={160} // Increased top to make space for difficulty indicator
+                    top={120} // Increased top to make space for difficulty indicator
                 />
             )}
             {isShieldActive && (
@@ -157,7 +157,7 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart, difficult
                     multiplierProgress={shieldDuration * 10}
                     isMultiplierActive={isShieldActive}
                     range={SHIELD_DURATION * 10}
-                    top={isMultiplierActive ? 190 : 160}
+                    top={isMultiplierActive ? 150 : 120}
                 />
             )}
             {isCoinMagnetActive && (
@@ -165,7 +165,7 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart, difficult
                     multiplierProgress={coinMagnetDuration * 10}
                     isMultiplierActive={isCoinMagnetActive}
                     range={MAGNET_DURATION * 10}
-                    top={isMultiplierActive && isShieldActive ? 220 : isMultiplierActive || isShieldActive ? 190 : 160}
+                    top={isMultiplierActive && isShieldActive ? 180 : isMultiplierActive || isShieldActive ? 150 : 120}
                 />
             )}
         </>

@@ -9,11 +9,12 @@ import {
     Physics, MoveShip, BulletShooter, AsteroidSpawner, CoinSpawner, MegaBombSpawner,
     MultiplierSpawner, ShieldSpawner, CoinMagnetSpawner, CoinAttractionSystem,
     handleCollisions, CleanupEntities, MoveMega, TimerSystem, initializeSystems,
-    useMegaBomb
+    useMegaBomb,
+    resetCollision
 } from './systems';
 import { createShip } from './entities';
 import { shipSize, spaceShipIcons, SHIELD_DURATION, MAGNET_DURATION, MULTIPLIER_DURATION, updatePowerUp, preloadAssets } from './constants';
-import { initializeSounds, cleanupSounds, getData, updateBestScore } from './utils';
+import { initializeSounds, cleanupSounds, getData, updateBestScore, stopSound, playSound } from './utils';
 import HUD from './HUD';
 import Spaceship from '../assets/Spaceship';
 import styles from './GameStyle';
@@ -297,6 +298,7 @@ export default function GameScreen({ navigation }) {
         setDisplayLives(activeShip.lives);
         setDisplayMegaBombCount(0);
         gameEngine.current?.swap(entitiesRef.current);
+        resetCollision()
     };
 
     useEffect(() => {
@@ -355,6 +357,7 @@ export default function GameScreen({ navigation }) {
     const pauseGame = () => {
         setGamePause(true);
         updateBestScore(gameStateRef.current.score, gameStateRef.current.coins);
+        stopSound('laser');
         setShowPauseModal(true);
     };
 
@@ -460,7 +463,7 @@ export default function GameScreen({ navigation }) {
                     running={!gameOver && !gamePause}
                 >
                     <StatusBar hidden={true} />
-                    <HUD gameState={gameStateRef.current} onUseMegaBomb={() => useMegaBomb()} showBlinkingHeart={showBlinkingHeart} difficulty={progressiveDifficultyRef.current?.currentMilestone || 0} />
+                    <HUD gameState={gameStateRef.current} onUseMegaBomb={() => useMegaBomb()} showBlinkingHeart={showBlinkingHeart} difficulty={progressiveDifficultyRef.current} />
                 </GameEngine>}
 
             <Modal animationType="fade" transparent={true} visible={modalVisible}>
@@ -482,7 +485,9 @@ export default function GameScreen({ navigation }) {
                     <View style={styles.modalContent}>
                         {!gameStart ? <Text style={{ ...styles.modalTitle, marginTop: 20 }}>Loading...</Text> : <>
                             <Text style={styles.modalTitle}>GAME PAUSE</Text>
-                            <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false); setShowPauseModal(false); }}>
+                            <TouchableScale style={styles.modalButton} onPress={() => { setGamePause(false); setShowPauseModal(false);
+                                playSound('laser');
+                             }}>
                                 <Text style={styles.modalButtonText}>Resume</Text>
                             </TouchableScale>
                             <TouchableScale style={styles.modalButton} onPress={() => navigation.replace('MainMenu')}>

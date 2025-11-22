@@ -2,41 +2,41 @@ export class ProgressiveDifficulty {
   constructor(gameStateRef) {
     this.gameStateRef = gameStateRef;
     this.difficultyMilestones = [
-      {score: 0, enemySpeed: 1.0, spawnRate: 800, enemies: ['asteroid']},
-      {score: 100, enemySpeed: 1.1, spawnRate: 700, enemies: ['asteroid']},
+      {score: 0, enemySpeed: 0.02, spawnRate: 800, enemies: ['asteroid']},
+      {score: 100, enemySpeed: 0.04, spawnRate: 700, enemies: ['asteroid']},
       {
         score: 200,
-        enemySpeed: 1.2,
+        enemySpeed: 0.06,
         spawnRate: 600,
         enemies: ['asteroid', 'meteor'],
       },
       {
         score: 300,
-        enemySpeed: 1.3,
+        enemySpeed: 0.08,
         spawnRate: 550,
         enemies: ['asteroid', 'meteor'],
       },
       {
         score: 500,
-        enemySpeed: 1.4,
+        enemySpeed: 0.1,
         spawnRate: 500,
         enemies: ['asteroid', 'meteor', 'mega'],
       },
       {
         score: 750,
-        enemySpeed: 1.5,
+        enemySpeed: 0.12,
         spawnRate: 450,
         enemies: ['asteroid', 'meteor', 'mega'],
       },
       {
         score: 1000,
-        enemySpeed: 1.6,
+        enemySpeed: 0.14,
         spawnRate: 400,
         enemies: ['asteroid', 'meteor', 'mega'],
       },
       {
         score: 1500,
-        enemySpeed: 1.8,
+        enemySpeed: 0.16,
         spawnRate: 350,
         enemies: ['asteroid', 'meteor', 'mega', 'boss'],
       },
@@ -153,7 +153,7 @@ export class ProgressiveDifficulty {
     const scalingFactor = 1 + extraScore / 5000; // Scale every 5000 points
 
     return {
-      enemySpeed: baseSettings.enemySpeed * scalingFactor,
+      enemySpeed: baseSettings.enemySpeed,
       spawnRate: Math.max(200, baseSettings.spawnRate / scalingFactor), // Cap minimum spawn rate
       unlockedEnemies: baseSettings.unlockedEnemies,
     };

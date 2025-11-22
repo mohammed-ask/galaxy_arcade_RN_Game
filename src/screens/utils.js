@@ -42,6 +42,12 @@ export const initializeSounds = async () => {
     });
 };
 
+export const stopSound = (soundKey) => {
+    if (soundRefs[soundKey]) {
+        soundRefs[soundKey].stop();
+    }
+};
+
 export const playSound = (soundKey, debounceTime = 0) => {
     if (!soundRefs[soundKey]) return;
 

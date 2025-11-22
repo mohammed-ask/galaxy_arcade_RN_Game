@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     },
     megaBombContainer: {
         position: 'absolute',
-        bottom: 20,
+        bottom: 65,
         left: 20,
         flexDirection: 'row',
         alignItems: 'center',
@@ -154,12 +154,13 @@ const styles = StyleSheet.create({
     // Add to GameStyle.js
 difficultyContainer: {
     position: 'absolute',
-    top: 80,
+    // top: 80,
     left: 20,
     right: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 10,
     padding: 10,
+    paddingVertical: 5,
     alignItems: 'center',
 },
 difficultyText: {
@@ -196,6 +197,7 @@ enemyIcon: {
     width: 24,
     height: 24,
     borderRadius: 12,
+    resizeMode: 'contain',
 },
 enemyUnlocked: {
     opacity: 1,

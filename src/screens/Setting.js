@@ -1,6 +1,6 @@
 // Settings.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, ImageBackground, Image, ScrollView, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TouchableScale from 'react-native-touchable-scale';
 
@@ -53,6 +53,52 @@ const Settings = ({ navigation }) => {
         saveSettings('musicEnabled', newValue);
     };
 
+    const otherApps = [
+        {
+          name: 'Brain Circles',
+          icon: require('../assets/imgaes/bc.png'),
+          link: 'https://play.google.com/store/apps/details?id=com.braindotspro',
+        },
+        {
+          name: 'Tell My Name',
+          icon: require('../assets/imgaes/tmn.png'),
+          link: 'https://play.google.com/store/apps/details?id=com.tellmyname',
+        },
+        {
+          name: 'Awesome Editor',
+          icon: require('../assets/imgaes/ae.png'),
+          link: 'https://play.google.com/store/apps/details?id=com.awesomeeditor',
+        },
+      ];
+    
+      const followOn = [
+        {
+          name: 'Instagram',
+          icon: require('../assets/imgaes/insta.png'),
+          link: 'https://www.instagram.com/switch_developers/',
+        },
+        {
+          name: 'YouTube',
+          icon: require('../assets/imgaes/youtube.png'),
+          link: 'https://youtube.com/@switchdevs-d3k?si=X1eX10bpMIopTEBr',
+        },
+        {
+          name: 'Twitter',
+          icon: require('../assets/imgaes/x.png'),
+          link: 'https://x.com/DevsSwitch?t=T2-VvLwsenRgHMl40acrUA&s=09',
+        },
+        {
+          name: 'Facebook',
+          icon: require('../assets/imgaes/facebook.png'),
+          link: 'https://www.facebook.com/share/1Biur4mkGj/',
+        },
+        {
+          name: 'Whatsapp',
+          icon: require('../assets/imgaes/whatsapp.png'),
+          link: 'https://chat.whatsapp.com/HwVnCOjFawK0m9C9aAWrWd?mode=wwt',
+        },
+      ];
+
     return (
         <ImageBackground source={require('../assets/imgaes/background3.jpg')} style={styles.container}>
             <View style={styles.containerInner}>
@@ -88,7 +134,78 @@ const Settings = ({ navigation }) => {
                 >
                     <Text style={styles.backButtonText}>Back</Text>
                 </TouchableScale>
+                <View
+        style={{
+          flex: 1,
+          paddingHorizontal: 15,
+          // flexDirection: 'row',
+          // alignItems: 'center',
+          justifyContent: 'flex-end',
+          // alignItems: 'flex-end',
+        }}>
+        <Text style={{...styles.headerTitle, marginBottom: 20}}>
+          More from Switch
+        </Text>
+        <View
+          style={{flexDirection: 'row', gap: 10, marginBottom: 30}}
+          horizontal>
+          {otherApps.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={{
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: 10,
+                padding: 10,
+                // elevation: 3,
+              }}
+              onPress={() => Linking.openURL(item.link)}>
+              <Image
+                source={item.icon}
+                style={{width: 75, height: 75, borderRadius: 10}}
+              />
+              <Text
+                style={{color: '#fff', fontFamily: 'Audiowide-Regular', fontSize: 10}}>
+                {item.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={{...styles.headerTitle, marginBottom: 10}}>Follow us</Text>
+        <ScrollView
+          style={{
+            flexDirection: 'row',
+            gap: 10,
+            // marginBottom: 50,
+            maxHeight: 80,
+          }}
+          contentContainerStyle={{alignItems: 'flex-end', gap: 10}}
+          horizontal>
+          {followOn.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={{
+                alignItems: 'center',
+                // backgroundColor: 'gray',
+                borderRadius: 10,
+                padding: 10,
+                // marginHorizontal: 5,
+              }}
+              onPress={() => Linking.openURL(item.link)}>
+              <Image
+                source={item.icon}
+                style={{width: 35, height: 35, borderRadius: 10}}
+              />
+              <Text
+                style={{color: '#fff', fontFamily: 'Audiowide-Regular',fontSize: 10}}>
+                {item.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
             </View>
+            
         </ImageBackground>
     );
 };
@@ -144,6 +261,14 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontFamily: 'Audiowide-Regular', // Use a pixelated font
     },
+
+    
+      headerTitle: {
+        fontSize: 18,
+        fontFamily: 'Audiowide-Regular',
+        marginTop: 15,
+        color: '#fff',
+      },
 });
 
 export default Settings;
