@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     animatedText: {
         fontSize: 28,
         fontFamily: 'Audiowide-Regular',
-        color: '#4c9a2a',
+        color: '#d900ee',
         marginBottom: 20,
         textAlign: 'center',
     },

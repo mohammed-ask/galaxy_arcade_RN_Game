@@ -183,7 +183,7 @@ const calculateEnemyProperties = (enemyType, enemySpeed = 1.0) => {
     const healthMultiplier = Math.min(2.0, 1 + (enemySpeed - 1) * 0.5); // Health increases slower
     return {
         radius: base.radius,
-        health: Math.ceil(base.health * healthMultiplier),
+        health: Math.ceil(base.health),
         // mass: base.mass,
         frictionAir: Math.max(0.01, base.frictionAir - enemySpeed), // Less air friction = faster
         restitution: base.restitution,

@@ -186,10 +186,9 @@ const Settings = ({ navigation }) => {
               key={index}
               style={{
                 alignItems: 'center',
-                // backgroundColor: 'gray',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
                 borderRadius: 10,
                 padding: 10,
-                // marginHorizontal: 5,
               }}
               onPress={() => Linking.openURL(item.link)}>
               <Image

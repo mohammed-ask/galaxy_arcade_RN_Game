@@ -30,7 +30,7 @@ const MainMenuScreen = () => {
       const music = await getData('musicEnabled')
 
       // Play the sound with an onEnd callback
-      if (music) {
+      if (music || music === null) {
         whooshRef.current.setVolume(0.1);
         whooshRef.current.play((success) => {
           if (success) {

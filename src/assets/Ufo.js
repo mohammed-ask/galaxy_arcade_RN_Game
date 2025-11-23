@@ -24,7 +24,7 @@ const Asteroid = ({ body, color, health, enemyGenerate }) => {
         >
           <View
             style={{
-              width: (health / 4) * 40,
+              width: (health / 4) * 80,
               height: 3,
               backgroundColor: 'green',
               borderRadius: 6
@@ -48,7 +48,7 @@ const Asteroid = ({ body, color, health, enemyGenerate }) => {
         >
           <View
             style={{
-              width: (health / 15) * 45,
+              width: (health / 15) * 60,
               height: 3,
               backgroundColor: 'green',
               borderRadius: 6

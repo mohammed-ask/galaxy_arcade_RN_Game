@@ -143,7 +143,7 @@ const Shop = ({ navigation }) => {
         const [showTooltip, setShowTooltip] = useState(false);  // Tooltip visibility state
 
         return (
-            <ImageBackground blurRadius={1} style={styles.card}>
+            <ImageBackground key={index} blurRadius={1} style={styles.card}>
                 {/* Info Icon */}
                 <View style={{ ...styles.infoContainer, display: isEmpty(specs) ? 'none' : 'flex' }}>
                     <TouchableOpacity
