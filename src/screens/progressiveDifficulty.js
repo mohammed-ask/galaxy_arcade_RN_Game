@@ -47,7 +47,7 @@ export class ProgressiveDifficulty {
     this.unlockedEnemies = new Set(['asteroid']);
   }
 
-  updateDifficulty(score) {
+  updateDifficulty(score,setters) {
     // Find the highest milestone we've reached
     let newMilestone = 0;
     for (let i = 0; i < this.difficultyMilestones.length; i++) {
@@ -71,10 +71,19 @@ export class ProgressiveDifficulty {
           milestone.score
         } points - New enemies: ${milestone.enemies.join(', ')}`,
       );
+      setters.openModal()
+      setTimeout(() => {
+          setters.closeModal()
+      }, 1800);
       return true; // New milestone reached
     }
 
     return false;
+  }
+
+  resetProgressiveDifficulty() {
+    this.currentMilestone = 0;
+    this.unlockedEnemies = new Set(['asteroid']);
   }
 
   getCurrentSettings() {

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Modal, Text, ImageBackground, StatusBar, AppState, BackHandler, Dimensions, Animated, Easing, TouchableOpacity } from 'react-native';
+import { View, Modal, Text, ImageBackground, StatusBar, AppState, BackHandler, Dimensions, Animated, Easing, TouchableOpacity, StyleSheet } from 'react-native';
 import Matter from 'matter-js';
 import { GameEngine } from 'react-native-game-engine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,6 +20,7 @@ import Spaceship from '../assets/Spaceship';
 import styles from './GameStyle';
 import Explosion from '../assets/Explosion';
 import { ProgressiveDifficulty } from './progressiveDifficulty';
+import LevelUpOverlay from '../components/LevelUpOverlay';
 
 const { width, height } = Dimensions.get('screen');
 
@@ -142,8 +143,8 @@ export default function GameScreen({ navigation }) {
             }
             await preloadAssets();
             setTimeout(async () => {
-                await resetGame();
                 progressiveDifficultyRef.current = new ProgressiveDifficulty(gameStateRef);
+                await resetGame();
                 // Pass setters to systems.js
                 initializeSystems(entitiesRef, gameStateRef, shipRef, {
                     setDisplayScore,
@@ -299,6 +300,7 @@ export default function GameScreen({ navigation }) {
         setDisplayMegaBombCount(0);
         gameEngine.current?.swap(entitiesRef.current);
         resetCollision()
+        progressiveDifficultyRef.current.resetProgressiveDifficulty()
     };
 
     useEffect(() => {
@@ -466,7 +468,7 @@ export default function GameScreen({ navigation }) {
                     <HUD gameState={gameStateRef.current} onUseMegaBomb={() => useMegaBomb()} showBlinkingHeart={showBlinkingHeart} difficulty={progressiveDifficultyRef.current} />
                 </GameEngine>}
 
-            <Modal animationType="fade" transparent={true} visible={modalVisible}>
+            <Modal animationType="fade" transparent={true} visible={modalVisible} statusBarTranslucent={true}>
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>GAME OVER</Text>
@@ -480,7 +482,7 @@ export default function GameScreen({ navigation }) {
                 </View>
             </Modal>
 
-            <Modal animationType="fade" transparent={true} visible={!gameStart || showPauseModal}>
+            <Modal animationType="fade" transparent={true} visible={!gameStart || showPauseModal} statusBarTranslucent={true}>
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
                         {!gameStart ? <Text style={{ ...styles.modalTitle, marginTop: 20 }}>Loading...</Text> : <>
@@ -496,29 +498,32 @@ export default function GameScreen({ navigation }) {
                     </View>
                 </View>
             </Modal>
-            <Modal
-                animationType="fade"
-                transparent={true}
-                visible={levelModalVisible}
-            >
-                <View style={styles.modalOverlay}>
-                    <TouchableOpacity style={styles.modalBackground} activeOpacity={1}>
-                        <View style={styles.modalContentLevel}>
-                            <Animated.Text
-                                style={[
-                                    styles.animatedText,
-                                    {
-                                        transform: [{ scale: scaleAnim }],
-                                        opacity: fadeAnim,
-                                    },
-                                ]}
-                            >
-                                LEVEL UP!
-                            </Animated.Text>
-                        </View>
-                    </TouchableOpacity>
+            
+            {levelModalVisible ?
+            <View pointerEvents="none" style={{
+                ...StyleSheet.absoluteFillObject,
+                pointerEvents: 'none',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: 'transparent',
+                zIndex: 9999,
+              }} >
+            <TouchableOpacity style={styles.modalBackground} activeOpacity={1} pointerEvents="box-none">
+                <View style={styles.modalContentLevel}>
+                    <Animated.Text
+                        style={[
+                            styles.animatedText,
+                            {
+                                transform: [{ scale: scaleAnim }],
+                                opacity: fadeAnim,
+                            },
+                        ]}
+                    >
+                        LEVEL UP!
+                    </Animated.Text>
                 </View>
-            </Modal>
+            </TouchableOpacity>
+        </View>:null}
         </ImageBackground>
     );
 }

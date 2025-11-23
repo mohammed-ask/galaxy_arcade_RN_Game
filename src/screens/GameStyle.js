@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)'
+        backgroundColor: 'rgba(0, 0, 0, 0.0)'
     },
     modalBackground: {
         width: '100%',
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     animatedText: {
         fontSize: 28,
         fontFamily: 'Audiowide-Regular',
-        color: '#FF6B6B',
+        color: '#4c9a2a',
         marginBottom: 20,
         textAlign: 'center',
     },

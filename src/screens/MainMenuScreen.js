@@ -253,17 +253,14 @@ const MainMenuScreen = () => {
         </TouchableScale>
 
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Image
+          <Text style={styles.text}>GAL<Image
             source={require('../assets/imgaes/spaceship.png')}
             style={{
-              position: 'absolute',
+              alignSelf: 'center',
               width: 50,
               height: 50,
-              top: '58%',
-              left: '48%',
             }}
-          />
-          <Text style={styles.text}>GAL{'  '}XY ARCADE</Text>
+          />XY ARCADE</Text>
         </View>
       </View>
 

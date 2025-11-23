@@ -90,7 +90,7 @@ export const TimerSystem = (entities, { time }) => {
     
     // Update progressive difficulty
     if (progressiveDifficulty) {
-      progressiveDifficulty.updateDifficulty(gameStateRef.current.score);
+      progressiveDifficulty.updateDifficulty(gameStateRef.current.score,setters);
     }
     
     return entities;
@@ -155,7 +155,7 @@ export const BulletShooter = (entities, { time }) => {
 
       // Simple bullet pattern based on score
       const score = gameStateRef.current.score;
-      if (score >= 500) {
+      if (score >= 2000) {
         // Triple shot at high scores
         const bullets = [
           getBulletFromPool(shipRef.current.position.x, shipRef.current.position.y - 30),
@@ -198,119 +198,213 @@ export const BulletShooter = (entities, { time }) => {
 let asteroidCooldown = 0;
 // Progressive Asteroid Spawner
 export const AsteroidSpawner = (entities, { time }) => {
-  try {
-    asteroidCooldown += time.delta;
-    
-    if (!progressiveDifficulty) return entities;
-    const settings = progressiveDifficulty.getInfiniteProgressionSettings();
-    
-    if (asteroidCooldown > settings.spawnRate && Math.random() < 0.02) {
-        asteroidCooldown = 0;
+    try {
+        asteroidCooldown += time.delta;
         
-        const enemyType = progressiveDifficulty.getRandomEnemyType();
-        const x = Math.random() * (width - 80) + 40;
+        if (!progressiveDifficulty) return entities;
         
-      switch (enemyType) {
-        case 'asteroid':
-          const asteroid = getAsteroidFromPool(x, 0, false, false, settings.enemySpeed);
-          if (asteroid) {
-            Matter.World.add(entities.physics.world, asteroid);
-            entities[`asteroid_${asteroid.id}`] = {
-              body: asteroid,
-              color: colors[Math.floor(Math.random() * colors.length)],
-              renderer: Asteroid,
-              health: 1,
-              enemyGenerate: asteroidImages[Math.floor(Math.random() * 8) + 1],
-            };
-          }
-          break;
-          
-        case 'meteor':
-          const meteor = getAsteroidFromPool(x, 0, true, false, settings.enemySpeed);
-          if (meteor) {
-            Matter.World.add(entities.physics.world, meteor);
-            entities[`meteor_${meteor.id}`] = {
-              body: meteor,
-              color: 'red',
-              renderer: Asteroid,
-              health: 2,
-              enemyGenerate: asteroidImages[Math.floor(Math.random() * 8) + 1],
-            };
-          }
-          break;
-          
-        case 'mega':
-          if (Math.random() < 0.7) { // 70% chance when available
-            const mega = getAsteroidFromPool(x, 0, false, true, settings.enemySpeed);
-            if (mega) {
-              Matter.World.add(entities.physics.world, mega);
-              entities[`mega_${mega.id}`] = { 
-                body: mega, 
-                color: 'purple', 
-                renderer: Asteroid, 
-                health: 20,
-                enemyGenerate: asteroidImages[Math.floor(Math.random() * 8) + 1],
-              };
-              gameStateRef.current.megaSpawned = true;
-            }
-          }
-          break;
-          
-        case 'boss':
-          if (!gameStateRef.current.bossSpawned && Math.random() < 0.05) { // 5% chance when available
-            const boss = getAsteroidFromPool(x, 0, false, false, settings.enemySpeed * 0.7, true); // Boss moves slower
-            if (boss) {
-              Matter.World.add(entities.physics.world, boss);
-              entities[`boss_${boss.id}`] = { 
-                body: boss, 
-                color: 'darkred', 
-                renderer: Asteroid, 
-                health: 50 
-              };
-              gameStateRef.current.bossSpawned = true;
-            }
-          }
-          break;
-      }
-    }
-
-    // Mega shooting
-    Object.keys(entities).forEach(key => {
-        const entity = entities[key];
-        if (entity.body?.label === 'mega' && Math.random() < 0.01) {
-            const bullet = getBulletFromPool(entity.body.position.x + 10, entity.body.position.y + 30, true);
-            if (bullet) {
-                Matter.Body.setVelocity(bullet, { x: 0, y: 3 });
-                Matter.World.add(entities.physics.world, bullet);
-                entities[`enemyBullet_${bullet.id}`] = { body: bullet, color: 'red', renderer: Bullet };
+        const settings = progressiveDifficulty.getInfiniteProgressionSettings();
+        
+        if (asteroidCooldown > settings.spawnRate && Math.random() < 0.1) {
+            asteroidCooldown = 0;
+            
+            const enemyType = progressiveDifficulty.getRandomEnemyType();
+            const x = Math.random() * (width - 80) + 40;
+            
+            switch (enemyType) {
+                case 'asteroid':
+                    const asteroid = getAsteroidFromPool(
+                        x, 0, 
+                        false, false, false, 
+                        settings.enemySpeed
+                    );
+                    if (asteroid) {
+                        Matter.World.add(entities.physics.world, asteroid);
+                        entities[`asteroid_${asteroid.id}`] = {
+                            body: asteroid,
+                            renderer: Asteroid,
+                            health: asteroid.health,
+                            enemyGenerate: asteroidImages[Math.floor(Math.random() * 8) + 1],
+                        };
+                    }
+                    break;
+                    
+                case 'meteor':
+                    const meteor = getAsteroidFromPool(
+                        x, 0, 
+                        true, false, false, 
+                        settings.enemySpeed
+                    );
+                    if (meteor) {
+                        Matter.World.add(entities.physics.world, meteor);
+                        entities[`meteor_${meteor.id}`] = {
+                            body: meteor,
+                            renderer: Asteroid,
+                            health: meteor.health,
+                            enemyGenerate: asteroidImages[Math.floor(Math.random() * 8) + 1],
+                        };
+                    }
+                    break;
+                    
+                case 'mega':
+                    if (Math.random() < 0.7) {
+                        const mega = getAsteroidFromPool(
+                            x, 0, 
+                            false, true, false, 
+                            settings.enemySpeed
+                        );
+                        if (mega) {
+                            Matter.World.add(entities.physics.world, mega);
+                            entities[`mega_${mega.id}`] = { 
+                                body: mega, 
+                                renderer: Asteroid, 
+                                health: mega.health,
+                                enemyGenerate: asteroidImages[Math.floor(Math.random() * 8) + 1],
+                            };
+                            gameStateRef.current.megaSpawned = true;
+                        }
+                    }
+                    break;
+                    
+                case 'boss':
+                    if (!gameStateRef.current.bossSpawned && Math.random() < 0.05) {
+                        const boss = getAsteroidFromPool(
+                            x, 0, 
+                            false, false, true, 
+                            settings.enemySpeed
+                        );
+                        if (boss) {
+                            Matter.World.add(entities.physics.world, boss);
+                            entities[`boss_${boss.id}`] = { 
+                                body: boss, 
+                                renderer: Asteroid, 
+                                health: boss.health 
+                            };
+                            gameStateRef.current.bossSpawned = true;
+                        }
+                    }
+                    break;
             }
         }
-    });
 
-    return entities;
-  } catch (e) {
-    console.log('asteroidspawner', e);
-  }
+        // Mega shooting
+        Object.keys(entities).forEach(key => {
+            const entity = entities[key];
+            if (entity.body?.label === 'mega' && Math.random() < 0.01) {
+                const bullet = getBulletFromPool(entity.body.position.x + 10, entity.body.position.y + 30, true);
+                if (bullet) {
+                    Matter.Body.setVelocity(bullet, { x: 0, y: 3 });
+                    Matter.World.add(entities.physics.world, bullet);
+                    entities[`enemyBullet_${bullet.id}`] = { body: bullet, color: 'red', renderer: Bullet };
+                }
+            }
+        });
+
+        return entities;
+    } catch (e) {
+        console.log('asteroidspawner', e);
+    }
 };
+
+// export const MoveMega = (entities, { time }) => {
+//     try {
+//         Object.keys(entities).forEach(key => {
+//             const entity = entities[key];
+//             if (entity.body?.label === 'mega') {
+//                 const t = time.current / 1000;
+//                 const amplitude = 100;
+//                 const frequency = 0.5;
+//                 const x = entity.body.position.x + Math.sin(t * frequency) * amplitude * 0.05;
+//                 const clampedX = Math.max(30, Math.min(width - 30, x));
+//                 Matter.Body.setPosition(entity.body, { x: clampedX, y: entity.body.position.y + 0.01 });
+//             }
+//         });
+//         return entities;
+//     } catch (e) {
+//         console.log(e, 'movemega')
+//     }
+// };
 
 export const MoveMega = (entities, { time }) => {
     try {
-        Object.keys(entities).forEach(key => {
-            const entity = entities[key];
-            if (entity.body?.label === 'mega') {
-                const t = time.current / 1000;
-                const amplitude = 100;
-                const frequency = 0.5;
-                const x = entity.body.position.x + Math.sin(t * frequency) * amplitude * 0.05;
-                const clampedX = Math.max(30, Math.min(width - 30, x));
-                Matter.Body.setPosition(entity.body, { x: clampedX, y: entity.body.position.y + 0.01 });
-            }
-        });
-        return entities;
+      const t = (time.current || 0) / 1000; // seconds
+  
+      Object.keys(entities).forEach(key => {
+        const entity = entities[key];
+        if (!entity?.body) return;
+  
+        // identify your megas — adjust label/type check to match your entities
+        if (entity.body.label !== 'mega') return;
+  
+        // --- initialize per-entity motion params (only once) ---
+        if (entity._megaInit !== true) {
+          entity._megaInit = true;
+          entity._megaBaseX = entity.body.position.x; // center around spawn x
+          entity._megaPhase = Math.random() * Math.PI * 2; // de-sync
+          entity._megaFreq = 0.3 + Math.random() * 0.7; // 0.3..1.0 Hz
+          entity._megaAmp = 20 + Math.random() * 60; // 20..80 px amplitude
+          entity._megaSmoothing = 0.12 + Math.random() * 0.18; // how fast it corrects
+          entity._megaEdgeTimer = 0; // used to nudge off edges
+        }
+  
+        const body = entity.body;
+        const baseX = entity._megaBaseX;
+        const phase = entity._megaPhase;
+        const freq = entity._megaFreq;
+        const amp = entity._megaAmp;
+        const smoothing = entity._megaSmoothing;
+  
+        // desired X follows its own sine wave
+        let desiredX = baseX + Math.sin(t * freq * 2 * Math.PI + phase) * amp;
+  
+        // keep desiredX inside safe bounds
+        const minX = 30;
+        const maxX = width - 30;
+        desiredX = Math.max(minX, Math.min(maxX, desiredX));
+  
+        const currentX = body.position.x;
+        const currentY = body.position.y;
+  
+        // compute velocity to move toward desiredX (proportional controller)
+        const distance = desiredX - currentX;
+        // smoothing acts like a responsiveness: higher => faster following
+        const vx = distance * smoothing;
+  
+        // preserve current vertical velocity rather than forcing a y change
+        const vy = body.velocity?.y || 0;
+  
+        // apply velocity
+        Matter.Body.setVelocity(body, { x: vx, y: vy });
+  
+        // small corrective position snap if mega is very far off (prevents drift)
+        const snapThreshold = 40;
+        if (Math.abs(distance) > snapThreshold) {
+          // gentle snap (avoid teleporting every frame)
+          Matter.Body.setPosition(body, { x: currentX + Math.sign(distance) * snapThreshold, y: currentY });
+        }
+  
+        // edge nudge: if it stays against an edge for a while, push it back a bit and randomize phase
+        if (currentX <= minX + 0.5 || currentX >= maxX - 0.5) {
+          entity._megaEdgeTimer = (entity._megaEdgeTimer || 0) + (time.delta || 16);
+        } else {
+          entity._megaEdgeTimer = 0;
+        }
+  
+        if (entity._megaEdgeTimer > 500) { // ms stuck
+          // give a small nudge away from the edge and randomize phase slightly
+          const nudge = currentX <= minX + 0.5 ? 10 : -10;
+          Matter.Body.setPosition(body, { x: Math.max(minX, Math.min(maxX, currentX + nudge)), y: currentY });
+          entity._megaPhase += (Math.random() - 0.5) * Math.PI * 0.5; // break sync
+          entity._megaEdgeTimer = 0;
+        }
+      });
+  
+      return entities;
     } catch (e) {
-        console.log(e, 'movemega')
+      console.log(e, 'movemega');
+      return entities;
     }
-};
+  };
 
 let coinCooldown = 0;
 export const CoinSpawner = (entities, { time }) => {
@@ -358,7 +452,7 @@ export const CoinSpawner = (entities, { time }) => {
 
 export const MegaBombSpawner = (entities) => {
     try {
-        if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
+        if (!gameStateRef.current.isPowerUpActive && gameStateRef.current.score > 500 && Math.random() < 0.001) {
             const x = Math.random() * (width - 40) + 20;
             const megaBomb = Matter.Bodies.circle(x, 0, 20, {
                 label: 'megaBomb',
@@ -377,7 +471,7 @@ export const MegaBombSpawner = (entities) => {
 
 export const MultiplierSpawner = (entities) => {
     try {
-        if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
+        if (!gameStateRef.current.isPowerUpActive && gameStateRef.current.score > 300 && Math.random() < 0.001) {
             const x = Math.random() * (width - 40) + 20;
             const multiplier = Matter.Bodies.circle(x, 0, 30, {
                 label: 'multiplier',
@@ -396,7 +490,7 @@ export const MultiplierSpawner = (entities) => {
 
 export const ShieldSpawner = (entities) => {
     try {
-        if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
+        if (!gameStateRef.current.isPowerUpActive && gameStateRef.current.score > 200 && Math.random() < 0.001) {
             const x = Math.random() * (width - 40) + 20;
             const shield = Matter.Bodies.circle(x, 0, 20, {
                 label: 'shield',
@@ -415,22 +509,41 @@ export const ShieldSpawner = (entities) => {
 
 export const CoinMagnetSpawner = (entities) => {
     try {
-        if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
-            const x = Math.random() * (width - 40) + 20;
-            const coinMagnet = Matter.Bodies.circle(x, 0, 20, {
-                label: 'coinMagnet',
-                isSensor: true,
-                frictionAir: 0.2,
-            });
-            Matter.World.add(entities.physics.world, coinMagnet);
-            entities[`coinMagnet_${Date.now()}`] = { body: coinMagnet, renderer: CoinMagnet };
-            gameStateRef.current.isPowerUpActive = true;
-        }
-        return entities;
+      // sanity checks
+      if (!entities || !entities.physics || !entities.physics.world) return entities;
+  
+      // only spawn when no powerup active
+      if (!gameStateRef.current.isPowerUpActive && Math.random() < 0.001) {
+        const radius = 20; // physics radius (px). Keep this = half of your sprite width in px
+        const horizontalPadding = 8; // extra padding from edges
+        const topPadding = 8; // push down so it is fully visible
+  
+        const minX = radius + horizontalPadding;
+        const maxX = width - radius - horizontalPadding;
+        const x = Math.random() * (maxX - minX) + minX;
+  
+        const y = radius + topPadding;
+  
+        const coinMagnet = Matter.Bodies.circle(x, y, radius, {
+          label: 'coinMagnet',
+          isSensor: true,
+          frictionAir: 0.2,
+          inertia: Infinity,
+        });
+  
+        Matter.World.add(entities.physics.world, coinMagnet);
+        const id = `coinMagnet_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        entities[id] = { body: coinMagnet, renderer: CoinMagnet };
+  
+        gameStateRef.current.isPowerUpActive = true;
+      }
+  
+      return entities;
     } catch (e) {
-        console.log('coinmagenr', e)
+      console.log('coinmagnet spawn error', e);
+      return entities;
     }
-};
+  };
 
 export const handleCollisions = (entities) => {
     try {

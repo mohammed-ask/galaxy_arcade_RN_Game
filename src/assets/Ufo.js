@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 const Asteroid = ({ body, color, health, enemyGenerate }) => {
 
@@ -31,6 +31,7 @@ const Asteroid = ({ body, color, health, enemyGenerate }) => {
 
             }}
           />
+          <Text style={{ color: 'white', fontSize: 10, position: 'absolute', right: 0, top: -10, fontFamily: 'Audiowide-Regular' }}>{health}</Text>
         </View>
       )}
       {body.label === 'mega' && (
@@ -54,6 +55,7 @@ const Asteroid = ({ body, color, health, enemyGenerate }) => {
 
             }}
           />
+          <Text style={{ color: 'white', fontSize: 10, position: 'absolute', right: 0, top: -10 ,fontFamily: 'Audiowide-Regular' }}>{health}</Text>
         </View>
       )}
     </>
