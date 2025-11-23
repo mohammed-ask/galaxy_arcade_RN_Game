@@ -157,7 +157,7 @@ difficultyContainer: {
     // top: 80,
     left: 20,
     right: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(85.1, 0, 93.3, 0.6)',
     borderRadius: 10,
     padding: 10,
     paddingVertical: 5,

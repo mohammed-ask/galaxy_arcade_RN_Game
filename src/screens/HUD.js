@@ -55,7 +55,7 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart, difficult
         'asteroid': require('../assets/imgaes/asteroid1.png'),
         'meteor': require('../assets/imgaes/asteroid2.png'),
         'mega': require('../assets/imgaes/mega.png'),
-        // 'boss': require('../assets/imgaes/boss.png'),
+        'boss': require('../assets/imgaes/omega.png'),
     };
 
     return (
@@ -81,7 +81,7 @@ const HUD = React.memo(({ gameState, onUseMegaBomb, showBlinkingHeart, difficult
 
             {/* Difficulty Progress Bar */}
             <View style={{...styles.difficultyContainer,position: 'absolute', bottom: 5}}>
-                <Text style={styles.difficultyText}>DIFFICULTY</Text>
+                <Text style={styles.difficultyText}>EMEMY</Text>
                 <View style={styles.difficultyBar}>
                     <View 
                         style={[

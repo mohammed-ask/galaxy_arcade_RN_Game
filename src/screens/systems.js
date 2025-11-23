@@ -13,6 +13,7 @@ import CoinMagnet from '../assets/CoinMagnet';
 import Boom from '../assets/Boom';
 import Explosion from '../assets/Explosion';
 import { isEmpty } from '../utils';
+import EnemyBullet from '../assets/EnemyBullet';
 
 const { width, height } = Dimensions.get('screen');
 
@@ -295,7 +296,7 @@ export const AsteroidSpawner = (entities, { time }) => {
                 if (bullet) {
                     Matter.Body.setVelocity(bullet, { x: 0, y: 3 });
                     Matter.World.add(entities.physics.world, bullet);
-                    entities[`enemyBullet_${bullet.id}`] = { body: bullet, color: 'red', renderer: Bullet };
+                    entities[`enemyBullet_${bullet.id}`] = { body: bullet, color: 'red', renderer: EnemyBullet };
                 }
             }
         });
@@ -304,6 +305,259 @@ export const AsteroidSpawner = (entities, { time }) => {
     } catch (e) {
         console.log('asteroidspawner', e);
     }
+};
+
+export const BossMovementSystem = (entities, { time }) => {
+    try {
+        Object.keys(entities).forEach(key => {
+            const entity = entities[key];
+            if (entity.body?.label === 'boss') {
+                const boss = entity.body;
+                const screenTop = 100; // Top 100 pixels
+                const screenBottom = height * 0.4; // Top 40% of screen
+                
+                // Keep boss in top half of screen
+                if (boss.position.y > screenBottom) {
+                    Matter.Body.setPosition(boss, { 
+                        x: boss.position.x, 
+                        y: screenBottom - 10 
+                    });
+                    Matter.Body.setVelocity(boss, { 
+                        x: boss.velocity.x, 
+                        y: -2 // Push upward
+                    });
+                }
+                
+                if (boss.position.y < screenTop) {
+                    Matter.Body.setPosition(boss, { 
+                        x: boss.position.x, 
+                        y: screenTop + 10 
+                    });
+                    Matter.Body.setVelocity(boss, { 
+                        x: boss.velocity.x, 
+                        y: 2 // Push downward
+                    });
+                }
+                
+                // Bounce off screen edges
+                if (boss.position.x < 40 || boss.position.x > width - 40) {
+                    Matter.Body.setVelocity(boss, { 
+                        x: -boss.velocity.x * 1.1, // Reverse and slightly accelerate
+                        y: boss.velocity.y 
+                    });
+                }
+                
+                // Complex movement pattern
+                if (!boss.lastPatternChange) boss.lastPatternChange = 0;
+                boss.lastPatternChange += time.delta;
+                
+                if (boss.lastPatternChange > 5000) { // Change pattern every 5 seconds
+                    boss.lastPatternChange = 0;
+                    const patterns = ['horizontal', 'vertical', 'circular', 'zigzag'];
+                    const newPattern = patterns[Math.floor(Math.random() * patterns.length)];
+                    boss.movementPattern = newPattern;
+                }
+                
+                // Apply movement pattern
+                switch (boss.movementPattern) {
+                    case 'horizontal':
+                        Matter.Body.setVelocity(boss, { 
+                            x: Math.sin(time.current / 1000) * 3, 
+                            y: 0 
+                        });
+                        break;
+                    case 'vertical':
+                        Matter.Body.setVelocity(boss, { 
+                            x: 0, 
+                            y: Math.cos(time.current / 800) * 2 
+                        });
+                        break;
+                    case 'circular':
+                        const radius = 100;
+                        const centerX = width / 2;
+                        const centerY = screenBottom / 2;
+                        const angle = time.current / 1500;
+                        Matter.Body.setPosition(boss, {
+                            x: centerX + Math.cos(angle) * radius,
+                            y: centerY + Math.sin(angle) * radius
+                        });
+                        break;
+                    case 'zigzag':
+                        Matter.Body.setVelocity(boss, { 
+                            x: 2,
+                            y: Math.sin(time.current / 500) * 2
+                        });
+                        break;
+                }
+            }
+        });
+        return entities;
+    } catch (e) {
+        console.log('bossmovement', e);
+    }
+};
+
+export const BossShieldSystem = (entities, { time }) => {
+    try {
+        Object.keys(entities).forEach(key => {
+            const entity = entities[key];
+            if (entity.body?.label === 'boss') {
+                const boss = entity.body;
+                
+                // Initialize shield properties
+                if (!boss.shieldCooldown) boss.shieldCooldown = 0;
+                if (!boss.isShieldActive) boss.isShieldActive = false;
+                if (!boss.shieldDuration) boss.shieldDuration = 0;
+                
+                boss.shieldCooldown += time.delta;
+                
+                // Activate shield periodically
+                if (!boss.isShieldActive && boss.shieldCooldown > 3000) {
+                    boss.isShieldActive = true;
+                    boss.shieldDuration = 2000; // 2 seconds shield
+                    boss.shieldCooldown = 0;
+                    boss.render.fillStyle = '#4169E1'; // Blue when shielded
+                    
+                    // Visual effect for shield activation
+                    playSound('shieldActivate');
+                }
+                
+                // Handle active shield
+                if (boss.isShieldActive) {
+                    boss.shieldDuration -= time.delta;
+                    
+                    // Pulsing shield effect
+                    const pulse = Math.sin(time.current / 200) * 0.3 + 0.7;
+                    boss.render.fillStyle = `rgb(65, 105, ${225 * pulse})`;
+                    
+                    if (boss.shieldDuration <= 0) {
+                        boss.isShieldActive = false;
+                        boss.render.fillStyle = '#8B0000'; // Back to red
+                        playSound('shieldDeactivate');
+                    }
+                }
+                
+                // Update entity for collision detection
+                entity.isShieldActive = boss.isShieldActive;
+            }
+        });
+        return entities;
+    } catch (e) {
+        console.log('bossshield', e);
+    }
+};
+
+export const BossAttackSystem = (entities, { time }) => {
+    try {
+        Object.keys(entities).forEach(key => {
+            const entity = entities[key];
+            if (entity.body?.label === 'boss') {
+                const boss = entity.body;
+                
+                // Initialize attack properties
+                if (!boss.lastAttack) boss.lastAttack = 0;
+                boss.lastAttack += time.delta;
+                
+                // Attack every 2 seconds
+                if (boss.lastAttack > 2000) {
+                    boss.lastAttack = 0;
+                    
+                    // Triple bullet burst in different directions
+                    const angles = [0, 120, 240]; // 3 directions separated by 120 degrees
+                    
+                    angles.forEach(angle => {
+                        const bullet = getBulletFromPool(
+                            boss.position.x, 
+                            boss.position.y + 40, 
+                            true // isEnemyBullet
+                        );
+                        
+                        if (bullet) {
+                            // Convert angle to radians and calculate direction
+                            const rad = angle * (Math.PI / 180);
+                            const speed = 4;
+                            const velocity = {
+                                x: Math.cos(rad) * speed,
+                                y: Math.sin(rad) * speed
+                            };
+                            
+                            Matter.Body.setVelocity(bullet, velocity);
+                            Matter.World.add(entities.physics.world, bullet);
+                            
+                            // Different color for boss bullets
+                            entities[`bossBullet_${bullet.id}_${angle}`] = { 
+                                body: bullet, 
+                                color: '#FF69B4', // Pink boss bullets
+                                renderer: EnemyBullet 
+                            };
+                        }
+                    });
+                    
+                    playSound('bossShoot');
+                }
+                
+                // Special attack every 10 seconds
+                if (!boss.lastSpecialAttack) boss.lastSpecialAttack = 0;
+                boss.lastSpecialAttack += time.delta;
+                
+                if (boss.lastSpecialAttack > 10000) {
+                    boss.lastSpecialAttack = 0;
+                    spawnSpecialAttack(entities, boss.position.x, boss.position.y);
+                }
+            }
+        });
+        return entities;
+    } catch (e) {
+        console.log('bossattack', e);
+    }
+};
+
+// Special attack pattern
+const spawnSpecialAttack = (entities, x, y) => {
+    // Circle pattern - 8 bullets in all directions
+    for (let i = 0; i < 6; i++) {
+        const bullet = getBulletFromPool(x, y, true);
+        if (bullet) {
+            const angle = (i / 8) * Math.PI * 2;
+            const speed = 3;
+            const velocity = {
+                x: Math.cos(angle) * speed,
+                y: Math.sin(angle) * speed
+            };
+            
+            Matter.Body.setVelocity(bullet, velocity);
+            Matter.World.add(entities.physics.world, bullet);
+            entities[`bossSpecialBullet_${bullet.id}_${i}`] = { 
+                body: bullet, 
+                color: '#FF4500', // Orange special bullets
+                renderer: EnemyBullet 
+            };
+        }
+    }
+    playSound('specialAttack');
+};
+
+const spawnBossDefeatEffect = (entities, x, y) => {
+    // Big explosion
+    const explosion = createExplosion(width / 9, height / 3)
+    Matter.World.add(entities.physics.world, explosion);
+    entities[`bossExplosion_${explosion.id}`] = { 
+        body: explosion, 
+        renderer: Explosion, 
+        timeout: setTimeout(() => delete entities[`bossExplosion_${explosion.id}`], 2000) 
+    };
+    
+    // Spawn coins as reward
+    for (let i = 0; i < 10; i++) {
+        const coin = getCoinFromPool(x + (Math.random() - 0.5) * 100, y + (Math.random() - 0.5) * 100);
+        if (coin) {
+            Matter.World.add(entities.physics.world, coin);
+            entities[`bossRewardCoin_${coin.id}_${i}`] = { body: coin, renderer: Coin };
+        }
+    }
+    
+    Vibration.vibrate(500);
+    playSound('bossDefeat');
 };
 
 // export const MoveMega = (entities, { time }) => {
@@ -551,6 +805,7 @@ export const handleCollisions = (entities) => {
             asteroid: { score: 10, sound: 'pop', onDestroy: null },
             meteor: { score: 20, sound: 'bossPop', onDestroy: null },
             mega: { score: 50, sound: 'bossPop', onDestroy: null },
+            boss: { score: 100, sound: 'bossPop', onDestroy: null },
         };
         if (!collisionRegistered) {
             Matter.Events.on(entities.physics.engine, 'collisionStart', (event) => {
@@ -568,27 +823,75 @@ export const handleCollisions = (entities) => {
                     if (bullet && target) {
                         pair.isProcessed = true;
                         const targetKey = Object.keys(entities).find(key => entities[key].body === target);
-                        Matter.World.remove(entities.physics.world, bullet);
-                        delete entities[Object.keys(entities).find(key => entities[key].body === bullet)];
-                        if (!isEmpty(entities[targetKey])) {
-                            entities[targetKey].health -= 1;
-                            if (entities[targetKey].health <= 0) {
-                                Matter.World.remove(entities.physics.world, target);
-                                delete entities[targetKey];
-                                const effect = collisionEffects[target.label];
-                                gameStateRef.current.score += effect.score * (gameStateRef.current.isMultiplierActive ? 2 : 1);
-                                setters.setDisplayScore(gameStateRef.current.score); // Update UI
-                                playSound(effect.sound);
-                                if (effect.onDestroy) effect.onDestroy(target.position.x, target.position.y);
-                                // if (target.label === 'mega') gameStateRef.current.megaSpawned = false;
 
-                                const boom = Matter.Bodies.circle(target.position.x, target.position.y, 30, { isStatic: true, isSensor: true });
-                                Matter.World.add(entities.physics.world, boom);
-                                entities[`boom_${boom.id}`] = {
-                                    body: boom, renderer: Boom, timeout: setTimeout(() => { Matter.World.remove(entities.physics.world, boom); delete entities[`boom_${boom.id}`] }, 300)
-                                };
+                        if (target.label === 'boss' && entities[targetKey]?.isShieldActive) {
+                            // Shield blocks damage but shows hit effect
+                            playSound('shieldBlock');
+                            
+                            // Create shield hit effect
+                            // const shieldHit = Matter.Bodies.circle(target.position.x, target.position.y, 50, {
+                            //     isStatic: true,
+                            //     isSensor: true,
+                            // });
+                            // Matter.World.add(entities.physics.world, shieldHit);
+                            // entities[`shieldHit_${shieldHit.id}`] = {
+                            //     body: shieldHit,
+                            //     renderer: Shield, // Use shield renderer for hit effect
+                            //     timeout: setTimeout(() => {
+                            //         Matter.World.remove(entities.physics.world, shieldHit);
+                            //         delete entities[`shieldHit_${shieldHit.id}`];
+                            //     }, 300),
+                            // };
+                        } else {
+                            // Normal damage processing
+                            Matter.World.remove(entities.physics.world, bullet);
+                            delete entities[Object.keys(entities).find(key => entities[key].body === bullet)];
+                            
+                            if (!isEmpty(entities[targetKey])) {
+                                entities[targetKey].health -= 1;
+                                if (entities[targetKey].health <= 0) {
+                                    Matter.World.remove(entities.physics.world, target);
+                                    delete entities[targetKey];
+                                    const effect = collisionEffects[target.label];
+                                    gameStateRef.current.score += effect.score * (gameStateRef.current.isMultiplierActive ? 2 : 1);
+                                    setters.setDisplayScore(gameStateRef.current.score);
+                                    playSound(effect.sound);
+                                    
+                                    // Boss defeat effect
+                                    if (target.label === 'boss') {
+                                        gameStateRef.current.bossSpawned = false;
+                                        spawnBossDefeatEffect(entities, target.position.x, target.position.y);
+                                    }
+
+                                    const boom = Matter.Bodies.circle(target.position.x, target.position.y, 30, { isStatic: true, isSensor: true });
+                                    Matter.World.add(entities.physics.world, boom);
+                                    entities[`boom_${boom.id}`] = {
+                                        body: boom, renderer: Boom, timeout: setTimeout(() => { Matter.World.remove(entities.physics.world, boom); delete entities[`boom_${boom.id}`] }, 300)
+                                    };
+                                }
                             }
                         }
+                        // Matter.World.remove(entities.physics.world, bullet);
+                        // delete entities[Object.keys(entities).find(key => entities[key].body === bullet)];
+                        // if (!isEmpty(entities[targetKey])) {
+                        //     entities[targetKey].health -= 1;
+                        //     if (entities[targetKey].health <= 0) {
+                        //         Matter.World.remove(entities.physics.world, target);
+                        //         delete entities[targetKey];
+                        //         const effect = collisionEffects[target.label];
+                        //         gameStateRef.current.score += effect.score * (gameStateRef.current.isMultiplierActive ? 2 : 1);
+                        //         setters.setDisplayScore(gameStateRef.current.score); // Update UI
+                        //         playSound(effect.sound);
+                        //         if (effect.onDestroy) effect.onDestroy(target.position.x, target.position.y);
+                        //         // if (target.label === 'mega') gameStateRef.current.megaSpawned = false;
+
+                        //         const boom = Matter.Bodies.circle(target.position.x, target.position.y, 30, { isStatic: true, isSensor: true });
+                        //         Matter.World.add(entities.physics.world, boom);
+                        //         entities[`boom_${boom.id}`] = {
+                        //             body: boom, renderer: Boom, timeout: setTimeout(() => { Matter.World.remove(entities.physics.world, boom); delete entities[`boom_${boom.id}`] }, 300)
+                        //         };
+                        //     }
+                        // }
                     }
 
                     if (shipRef.current === bodyA || shipRef.current === bodyB) {

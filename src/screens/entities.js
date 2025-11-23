@@ -167,12 +167,19 @@ const calculateEnemyProperties = (enemyType, enemySpeed = 1.0) => {
         },
         boss: {
             radius: 45,
-            health: 30,
+            health: 100,
             // mass: 10,
             frictionAir: 0.8,
             restitution: 0.9,
             color: '#8B0000',
-            velocity: { x: (Math.random() - 0.5) * 0.3, y: 1.5 }
+            velocity: { x: (Math.random() - 0.5) * 0.3, y: 1.5 },
+            abilities: {
+                hasShield: true,
+                shieldCooldown: 3000, // 3 seconds shield cooldown
+                bulletSpawnCooldown: 2000, // 2 seconds between bullet bursts
+                movementPattern: 'horizontal', // Starts with horizontal movement
+                spawnMinions: true
+            }
         }
     };
 

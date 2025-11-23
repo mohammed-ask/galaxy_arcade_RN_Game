@@ -10,7 +10,10 @@ import {
     MultiplierSpawner, ShieldSpawner, CoinMagnetSpawner, CoinAttractionSystem,
     handleCollisions, CleanupEntities, MoveMega, TimerSystem, initializeSystems,
     useMegaBomb,
-    resetCollision
+    resetCollision,
+    BossMovementSystem,
+    BossShieldSystem,
+    BossAttackSystem
 } from './systems';
 import { createShip } from './entities';
 import { shipSize, spaceShipIcons, SHIELD_DURATION, MAGNET_DURATION, MULTIPLIER_DURATION, updatePowerUp, preloadAssets } from './constants';
@@ -46,6 +49,7 @@ export default function GameScreen({ navigation }) {
         levelUp: false,
         level3: false,
         megaSpawned: false,
+        bossSpawned: false,
         isShieldActive: false,
         shieldDuration: 0,
         isCoinMagnetActive: false,
@@ -444,6 +448,9 @@ export default function GameScreen({ navigation }) {
         BulletShooter,
         AsteroidSpawner,
         MoveMega,
+        BossMovementSystem,    // Add this
+        BossShieldSystem,      // Add this
+        BossAttackSystem,      // Add this
         CoinSpawner,
         MegaBombSpawner,
         MultiplierSpawner,
