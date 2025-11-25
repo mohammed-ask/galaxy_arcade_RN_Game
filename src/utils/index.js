@@ -71,7 +71,7 @@ export const getData = async key => {
         if (storageData !== null) {
             data = storageData;
         }
-        return JSON.parse(data);
+        return data ? JSON.parse(data) : null;
     } catch (e) {
         console.log('Error on Storage', e)
     }

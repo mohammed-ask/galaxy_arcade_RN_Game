@@ -265,7 +265,7 @@ const MainMenuScreen = () => {
       </View>
 
       {/* Modal for User Name Input */}
-      <Modal animationType="fade" transparent={true} visible={modalVisible}>
+      <Modal animationType="fade" transparent={true} statusBarTranslucent={true} visible={modalVisible}>
         <View style={styles.modalContainer}>
           <View style={[styles.modalContent]}>
             <Text style={styles.modalTitle}>Enter Your Name</Text>

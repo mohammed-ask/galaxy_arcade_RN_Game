@@ -138,6 +138,19 @@ const Shop = ({ navigation }) => {
         })()
     }, [shipData])
 
+    // useEffect(() => {
+    //     (async ()=>{
+    //         //Add 500 coins
+    //         const coins = userDetail.Coins
+    //         const totalCoins = Number(coins) + 5000
+    //         AsyncStorage.setItem('Coins', totalCoins.toString())
+    //         setUserDetail(prev => ({
+    //             ...prev,
+    //             Coins: totalCoins
+    //         }));
+    //     })()
+    // }, [])
+
     const ShipCard = ({ ship, index }) => {
         const { name, unlock, cost, active, id, specs } = ship;
         const [showTooltip, setShowTooltip] = useState(false);  // Tooltip visibility state
@@ -263,7 +276,7 @@ const Shop = ({ navigation }) => {
                     </ScrollView>
                 </View>
             </BlurView>
-            <Modal animationType="fade" transparent={true} visible={modalVisible}>
+            <Modal animationType="fade" transparent={true} statusBarTranslucent={true} visible={modalVisible}>
                 <View style={styles.modalContainer}>
                     <View style={[styles.modalContent]}>
                         {isEmpty(showCoinAlert) ?
