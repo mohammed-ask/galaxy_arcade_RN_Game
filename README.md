@@ -1,8 +1,13 @@
-<img width="1080" height="2340" alt="shared image (15)" src="https://github.com/user-attachments/assets/d94495fd-5b17-459b-8bf1-01dc5c7db600" />
-<img width="1080" height="2340" alt="shared image (16)" src="https://github.com/user-attachments/assets/8cdb1a17-144b-43fe-84ff-a3737071db2b" />
-<img width="1080" height="2340" alt="shared image (17)" src="https://github.com/user-attachments/assets/686392dd-f969-4d04-bc85-0214f5dc53d4" />
-<img width="1080" height="2340" alt="shared image (18)" src="https://github.com/user-attachments/assets/72ba6aee-6fda-4180-a4d5-272072d91dc6" />
-<img width="1080" height="2340" alt="shared image (14)" src="https://github.com/user-attachments/assets/448d7ade-5d4b-4f78-a4f1-197cfcbe4311" />
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/d94495fd-5b17-459b-8bf1-01dc5c7db600" width="250" />
+  <img src="https://github.com/user-attachments/assets/8cdb1a17-144b-43fe-84ff-a3737071db2b" width="250" />
+  <img src="https://github.com/user-attachments/assets/686392dd-f969-4d04-bc85-0214f5dc53d4" width="250" />
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/72ba6aee-6fda-4180-a4d5-272072d91dc6" width="250" />
+  <img src="https://github.com/user-attachments/assets/448d7ade-5d4b-4f78-a4f1-197cfcbe4311" width="250" />
+</p>
 This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
 # Getting Started
